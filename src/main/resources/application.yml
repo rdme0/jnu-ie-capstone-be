@@ -1,0 +1,8 @@
+spring.application.name: capstone
+
+aes256.key: ${AES256_KEY}
+
+spring.security.oauth2.client.registration:
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_REST_API_KEY}
