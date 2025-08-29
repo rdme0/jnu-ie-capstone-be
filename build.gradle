@@ -34,6 +34,11 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
+    //jwt
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
     //junit
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
@@ -59,6 +64,9 @@ dependencies {
 
     //jackson
     implementation 'com.fasterxml.jackson.module:jackson-module-jsonSchema:2.19.2'
+
+    //PostgreSQL
+    implementation 'org.postgresql:postgresql'
 }
 
 kotlin {

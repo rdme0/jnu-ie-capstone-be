@@ -1,10 +1,9 @@
-spring.application.name: capstone
-
-aes256.key: ${AES256_KEY}
-
-spring.security.oauth2.client.registration:
-  kakao:
-    client-id: ${KAKAO_CLIENT_ID}
-    client-secret: ${KAKAO_CLIENT_SECRET}
-
-auth.allowed-front-end-origins: http://localhost:*,https://localhost:*,https://st4r-starlight.vercel.app
+spring:
+  application.name: capstone
+  profiles.default: dev
+  config:
+    import:
+      - classpath:config/application-security.yml
+      - classpath:config/application-dev-db.yml
+server:
+  port: 9090

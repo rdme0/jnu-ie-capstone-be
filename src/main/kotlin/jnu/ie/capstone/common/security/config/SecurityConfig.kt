@@ -7,11 +7,11 @@ import org.springframework.messaging.MessageChannel
 import org.springframework.messaging.support.ChannelInterceptor
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
-import org.springframework.security.config.annotation.web.builders.WebSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.web.SecurityFilterChain
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
@@ -34,12 +34,9 @@ class SecurityConfig(
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
-        configuration.setAllowedOriginPatterns(
-            allowedOriginsProperties.allowedFrontEndOrigins
-        )
-        configuration.setAllowedMethods(
+        configuration.allowedOriginPatterns = allowedOriginsProperties.allowedFrontEndOrigins
+        configuration.allowedMethods =
             mutableListOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-        )
         configuration.allowedHeaders = mutableListOf("*")
         configuration.allowCredentials = true
         configuration.maxAge = CORS_MAX_AGE
@@ -55,8 +52,8 @@ class SecurityConfig(
     }
 
     @Bean
-    fun securityFilterChain(http: HttpSecurity) {
-        http.headers { it.frameOptions { it -> it.sameOrigin() } }
+    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+        return http.headers { it.frameOptions { it.sameOrigin() } }
             .cors { it.configurationSource(corsConfigurationSource()) }
             .authorizeHttpRequests {
                 it.requestMatchers("/h2-console/**", "/auth/success").permitAll()
