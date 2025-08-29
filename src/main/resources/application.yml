@@ -5,5 +5,3 @@ spring:
     import:
       - classpath:config/application-security.yml
       - classpath:config/application-dev-db.yml
-server:
-  port: 9090
