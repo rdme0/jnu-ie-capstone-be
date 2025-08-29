@@ -5,6 +5,7 @@ import jnu.ie.capstone.member.model.vo.Email
 import jnu.ie.capstone.member.repository.MemberRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import kotlin.jvm.optionals.getOrNull
 
 @Service
 class MemberDataService(
@@ -15,4 +16,7 @@ class MemberDataService(
 
     @Transactional(readOnly = true)
     fun get(email: Email) = repository.findByEmail(email)
+
+    @Transactional(readOnly = true)
+    fun get(id: Long) = repository.findById(id).getOrNull()
 }

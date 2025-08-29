@@ -1,8 +1,11 @@
 package jnu.ie.capstone.member.service
 
 import jnu.ie.capstone.common.security.oauth.dto.internal.OAuth2MemberInfo
+import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.member.model.entity.Member
+import jnu.ie.capstone.member.model.vo.Email
 import jnu.ie.capstone.member.service.internal.MemberDataService
+import org.springframework.data.jpa.domain.AbstractPersistable_.id
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -10,13 +13,24 @@ import org.springframework.transaction.annotation.Transactional
 class MemberCoordinateService(
     private val dataService: MemberDataService
 ) {
-    @Transactional(readOnly = true)
-    fun getOrSave(oAuth2MemberInfo: OAuth2MemberInfo): Member {
-        return dataService.get(oAuth2MemberInfo.email)
+    @Transactional
+    fun getOrSave(oAuth2MemberInfo: OAuth2MemberInfo): MemberInfo {
+        val member = getEntityByEmail(oAuth2MemberInfo.email)
             ?: dataService.save(
                 Member.builder()
+                    .provider(oAuth2MemberInfo.provider)
                     .email(oAuth2MemberInfo.email)
                     .build()
             )
+
+        return MemberInfo.from(member)
+    }
+
+    private fun getEntityByEmail(email: Email) = dataService.get(email)
+
+    @Transactional(readOnly = true)
+    fun get(id: Long) : MemberInfo? {
+        val member = dataService.get(id) ?: return null
+        return MemberInfo.from(member)
     }
 }
