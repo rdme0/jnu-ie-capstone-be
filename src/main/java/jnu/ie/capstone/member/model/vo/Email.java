@@ -2,6 +2,7 @@ package jnu.ie.capstone.member.model.vo;
 
 import jakarta.persistence.Convert;
 import jakarta.persistence.Embeddable;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import jnu.ie.capstone.common.converter.StringEncryptConverter;
 import jnu.ie.capstone.common.exception.client.BadDataSyntaxException;
@@ -31,5 +32,19 @@ public class Email {
         if (value == null || !EMAIL_PATTERN.matcher(value).matches()) {
             throw new BadDataSyntaxException("올바른 이메일 형식이 아닙니다.");
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        Email email = (Email) o;
+        return Objects.equals(getValue(), email.getValue());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(getValue());
     }
 }
