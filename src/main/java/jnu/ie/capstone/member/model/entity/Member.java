@@ -31,8 +31,13 @@ public class Member {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private Oauth2Provider provider;
+
     @Builder
-    Member(Email email) {
+    Member(Oauth2Provider provider, Email email) {
+        this.provider = provider;
         this.email = email;
         this.role = Role.USER;
     }
