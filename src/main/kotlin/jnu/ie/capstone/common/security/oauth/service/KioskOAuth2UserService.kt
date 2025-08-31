@@ -2,7 +2,6 @@ package jnu.ie.capstone.common.security.oauth.service
 
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
 import jnu.ie.capstone.common.security.oauth.dto.internal.OAuth2MemberInfo
-import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.member.service.MemberCoordinateService
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest
@@ -28,7 +27,7 @@ class KioskOAuth2UserService(
         )
 
         return KioskUserDetails(
-            memberInfo = MemberInfo.from(memberService.getOrSave(oauth2MemberInfo)),
+            memberInfo = memberService.getOrSave(oauth2MemberInfo),
             attributes = oAuth2UserAttributes,
             userNameAttributeName = userNameAttributeName
         )

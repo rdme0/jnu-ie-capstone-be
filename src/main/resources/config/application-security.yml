@@ -6,8 +6,9 @@ spring.security.oauth2.client:
       authorization-grant-type: authorization_code
       client-secret: ${KAKAO_CLIENT_SECRET}
       client-id: ${KAKAO_CLIENT_ID}
-      scope: account_email
       client-name: kakao
+      scope:
+        - account_email
 
   provider:
     kakao:
