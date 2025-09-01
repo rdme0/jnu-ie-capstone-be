@@ -3,6 +3,7 @@ package jnu.ie.capstone.common.security.filter
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import jnu.ie.capstone.common.constant.CommonConstants.CRITICAL_ERROR_MESSAGE
 import jnu.ie.capstone.common.security.exception.handler.Rest401Handler
 import jnu.ie.capstone.common.security.exception.handler.Rest500Handler
 import jnu.ie.capstone.common.security.helper.JwtAuthHelper
@@ -24,7 +25,6 @@ class JwtAuthFilter(
 
     companion object {
         private const val AUTHORIZATION_HEADER = "Authorization"
-        private const val CRITICAL_AUTH_ERROR_MESSAGE = "알 수 없는 예외로 인한 인증 실패"
         private val WHITELIST = setOf(
             "/h2-console/**",
             "/auth/success",
@@ -59,7 +59,7 @@ class JwtAuthFilter(
             rest500Handler.commence(
                 request,
                 response,
-                AuthenticationServiceException(CRITICAL_AUTH_ERROR_MESSAGE, e)
+                AuthenticationServiceException(CRITICAL_ERROR_MESSAGE.format("인증"), e)
             )
             SecurityContextHolder.clearContext()
             throw e
