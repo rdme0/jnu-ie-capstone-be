@@ -6,6 +6,7 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.lombok' version '2.2.0'
     id 'org.springframework.boot' version '3.5.4'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.google.protobuf' version '0.9.4'
 }
 
 group = 'jnu.ie'
@@ -22,6 +23,10 @@ repositories {
     mavenCentral()
 }
 
+ext {
+    set('springGrpcVersion', "0.10.0")
+}
+
 dependencies {
     //spring
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -29,6 +34,13 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.grpc:spring-grpc-test'
+
+    //spring-gRPC
+    implementation 'org.springframework.grpc:spring-grpc-spring-boot-starter'
+
+    //grpc
+    implementation 'io.grpc:grpc-services'
 
     //spring-security
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -73,13 +85,43 @@ dependencies {
 
     //PostgreSQL
     implementation 'org.postgresql:postgresql'
+
+    //Gemini
+    implementation 'com.google.genai:google-genai:1.15.0'
+
 }
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.grpc:spring-grpc-dependencies:${property("springGrpcVersion")}")
+    }
+}
+
 
 kotlin {
     compilerOptions {
         freeCompilerArgs.addAll '-Xjsr305=strict'
     }
 }
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc'
+    }
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java'
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {
+                option '@generated=omit'
+            }
+        }
+    }
+}
+
 
 tasks.named('test') {
     useJUnitPlatform()
