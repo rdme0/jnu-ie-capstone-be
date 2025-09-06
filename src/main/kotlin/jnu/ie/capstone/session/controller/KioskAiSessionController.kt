@@ -14,7 +14,7 @@ class KioskAiSessionController(
     private val service: KioskAiSessionService
 ) {
 
-    @MessageMapping("order.voice")
+    @MessageMapping("/order/voice")
     suspend fun receiveOrderVoice(voiceStream: Flow<VoiceRequestChunk>) {
         logger.info { "order voice 요청을 받았습니다." }
         service.processVoiceChunk(voiceStream)
