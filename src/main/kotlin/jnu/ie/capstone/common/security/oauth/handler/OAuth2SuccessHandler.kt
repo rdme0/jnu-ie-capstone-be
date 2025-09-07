@@ -14,7 +14,7 @@ import org.springframework.web.util.UriComponentsBuilder
 @Component
 class OAuth2SuccessHandler(
     @param:Value("\${auth.success-uri}")
-    val successUri : String,
+    val successUri: String,
     private val jwtUtil: JwtUtil
 ) : AuthenticationSuccessHandler {
 
@@ -23,7 +23,11 @@ class OAuth2SuccessHandler(
         response: HttpServletResponse,
         authentication: Authentication
     ) {
-        val userDetails = authentication.principal as KioskUserDetails
+        val userDetails = authentication.principal as? KioskUserDetails
+            ?: run {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED)
+                return
+            }
         val accessToken: String = jwtUtil.generateToken(userDetails.memberInfo)
         val redirectUrl = UriComponentsBuilder.fromUriString(successUri)
             .queryParam("accessToken", accessToken)
