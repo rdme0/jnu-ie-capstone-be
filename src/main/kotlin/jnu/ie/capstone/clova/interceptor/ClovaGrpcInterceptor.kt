@@ -15,7 +15,7 @@ class ClovaGrpcInterceptor(private val config: ClovaConfig) : ClientInterceptor 
             SimpleForwardingClientCall<ReqT?, RespT?>(next.newCall(method, callOptions)) {
             override fun start(responseListener: Listener<RespT?>?, headers: Metadata) {
                 headers.put(
-                    Metadata.Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER),
+                    Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER),
                     "Bearer ${config.apiKey}"
                 )
                 super.start(responseListener, headers)
