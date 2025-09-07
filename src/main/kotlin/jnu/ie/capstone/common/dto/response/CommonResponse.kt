@@ -3,9 +3,9 @@ package jnu.ie.capstone.common.dto.response
 import jnu.ie.capstone.common.exception.enums.ErrorCode
 
 data class CommonResponse(
-    private val isSuccess: Boolean,
-    private val message: String,
-    private val errorCode: String?
+    val isSuccess: Boolean,
+    val message: String,
+    val errorCode: String?
 ) {
     companion object {
         private const val SUCCESS = "success"
