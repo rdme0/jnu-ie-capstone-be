@@ -1,13 +1,12 @@
 package jnu.ie.capstone.common.security.util
 
-
+import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.JwtParser
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import jakarta.annotation.PostConstruct
 import jnu.ie.capstone.member.dto.MemberInfo
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.security.oauth2.jwt.JwtException
 import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.*
@@ -46,6 +45,7 @@ class JwtUtil(
     }
 
     fun validateToken(token: String?): Boolean {
+        if (token.isNullOrBlank()) return false
         return try {
             jwtParser.parseSignedClaims(token)
             !isTokenExpired(token)
