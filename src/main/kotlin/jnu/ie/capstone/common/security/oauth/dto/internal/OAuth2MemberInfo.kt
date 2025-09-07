@@ -17,7 +17,7 @@ data class OAuth2MemberInfo(
         }
 
         private fun ofKakao(attributes: Map<String, Any>): OAuth2MemberInfo {
-            val account = attributes["kakao_account"] as? MutableMap<*, *>
+            val account = attributes["kakao_account"] as? Map<*, *>
                 ?: throw InternalServerException(IllegalStateException("kakao_account가 null일 수 없습니다."))
 
             val value = account["email"] as? String
