@@ -14,7 +14,6 @@ class KioskOAuth2UserService(
     private val memberService: MemberCoordinateService
 ) : DefaultOAuth2UserService() {
 
-    @Transactional
     override fun loadUser(userRequest: OAuth2UserRequest): OAuth2User {
         val oAuth2UserAttributes = super.loadUser(userRequest).attributes
         val registrationId = userRequest.clientRegistration.registrationId
