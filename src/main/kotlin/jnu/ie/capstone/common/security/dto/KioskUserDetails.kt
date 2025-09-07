@@ -18,11 +18,11 @@ data class KioskUserDetails(
     override fun getUsername(): String = memberInfo.email.value
     override fun getPassword(): String = "Social"
     override fun getAuthorities() = listOf(SimpleGrantedAuthority(ROLE_PREFIX + memberInfo.role))
-    override fun isAccountNonLocked() = super.isAccountNonLocked()
-    override fun isAccountNonExpired() = super.isAccountNonExpired()
-    override fun isCredentialsNonExpired() = super.isCredentialsNonExpired()
-    override fun isEnabled() = super.isEnabled()
-    override fun getName() = attributes?.get(userNameAttributeName)?.toString()
+    override fun isAccountNonLocked() = true
+    override fun isAccountNonExpired() = true
+    override fun isCredentialsNonExpired() = true
+    override fun isEnabled() = true
+    override fun getName() = attributes?.get(userNameAttributeName)?.toString() ?: "UNKNOWN"
     override fun getAttributes() = this.attributes
 
 }
