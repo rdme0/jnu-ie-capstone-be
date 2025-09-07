@@ -1,14 +1,18 @@
 package jnu.ie.capstone.clova.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.protobuf.ByteString
 import io.grpc.stub.StreamObserver
+import jnu.ie.capstone.clova.dto.internal.ExtraContents
+import jnu.ie.capstone.clova.dto.internal.NestConfigDTO
+import jnu.ie.capstone.clova.dto.internal.TranscriptionConfig
+import jnu.ie.capstone.clova.enums.ClovaSpeechLanguage
 import jnu.ie.capstone.grpc.NestConfig
 import jnu.ie.capstone.grpc.NestData
 import jnu.ie.capstone.grpc.NestRequest
 import jnu.ie.capstone.grpc.NestResponse
 import jnu.ie.capstone.grpc.NestServiceGrpc
 import jnu.ie.capstone.grpc.RequestType
-import jnu.ie.capstone.session.dto.request.VoiceRequestChunk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -16,86 +20,91 @@ import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
-
-private val logger = KotlinLogging.logger {}
-
 @Service
 class ClovaSpeechService(
-    private val stub: NestServiceGrpc.NestServiceStub
+    private val stub: NestServiceGrpc.NestServiceStub,
+    private val mapper: ObjectMapper
 ) {
+    private val logger = KotlinLogging.logger {}
+    private val nestConfig = NestConfigDTO(TranscriptionConfig(language = ClovaSpeechLanguage.ko))
 
     suspend fun recognizeVoice(
-        voiceStream: Flow<VoiceRequestChunk>,
+        voiceStream: Flow<ByteArray>,
         sendResult: suspend (String) -> Unit
     ) = coroutineScope {
-        val cont = CompletableDeferred<Unit>()
+        val streamCompleted = CompletableDeferred<Unit>()
 
         val responseObserver = object : StreamObserver<NestResponse> {
             override fun onNext(value: NestResponse) {
-                val resultText = value.contents
-                logger.info { "Clova partial result: $resultText" }
-
                 launch {
+                    val resultText = value.contents
+                    logger.info { "Clova partial result: $resultText" }
                     sendResult(resultText)
                 }
             }
 
             override fun onError(t: Throwable) {
                 logger.error(t) { "Clova Speech gRPC error" }
-                cont.completeExceptionally(t)
+                streamCompleted.completeExceptionally(t)
             }
 
             override fun onCompleted() {
                 logger.info { "Clova Speech stream completed" }
-                cont.complete(Unit)
+                streamCompleted.complete(Unit)
             }
         }
 
         val requestObserver = stub.recognize(responseObserver)
 
-        requestObserver.onNext(
-            NestRequest.newBuilder()
-                .setType(RequestType.CONFIG)
-                .setConfig(
-                    NestConfig.newBuilder()
-                        .setConfig("""{"transcription":{"language":"ko"}}""")
-                        .build()
-                )
-                .build()
-        )
+        requestObserver.sendConfig()
 
         launch {
-            var seqId = 0
-            voiceStream.collect { chunk ->
-                requestObserver.onNext(
-                    NestRequest.newBuilder()
-                        .setType(RequestType.DATA)
-                        .setData(
-                            NestData.newBuilder()
-                                .setChunk(ByteString.copyFrom(chunk.data))
-                                .setExtraContents("""{"seqId":$seqId,"epFlag":false}""")
-                                .build()
-                        )
-                        .build()
-                )
-                seqId++
+            try {
+                var seqId = 0L
+                voiceStream.collect { chunk ->
+                    requestObserver.sendData(chunk, seqId++, false)
+                }
+                requestObserver.sendData(ByteArray(0), -1, true)
+            } catch (e: Exception) {
+                logger.error(e) { "Error while collecting voice stream. Notifying server." }
+                requestObserver.onError(e)
+                throw e
+            } finally {
+                logger.info { "Client finished sending data. Closing request stream." }
+                requestObserver.onCompleted()
             }
-
-            requestObserver.onNext(
-                NestRequest.newBuilder()
-                    .setType(RequestType.DATA)
-                    .setData(
-                        NestData.newBuilder()
-                            .setChunk(ByteString.EMPTY)
-                            .setExtraContents("""{"seqId":-1,"epFlag":true}""")
-                            .build()
-                    )
-                    .build()
-            )
-            requestObserver.onCompleted()
         }
 
-        cont.await()
+        streamCompleted.await()
     }
 
+    private fun StreamObserver<NestRequest>.sendConfig() {
+        val configRequest = NestRequest.newBuilder()
+            .setType(RequestType.CONFIG)
+            .setConfig(
+                NestConfig.newBuilder()
+                    .setConfig(mapper.writeValueAsString(nestConfig))
+                    .build()
+            )
+            .build()
+        this.onNext(configRequest)
+    }
+
+    private fun StreamObserver<NestRequest>.sendData(
+        chunk: ByteArray,
+        seqId: Long,
+        isEnd: Boolean
+    ) {
+        val extra = ExtraContents(seqId = seqId, epFlag = isEnd)
+        val dataRequest = NestRequest.newBuilder()
+            .setType(RequestType.DATA)
+            .setData(
+                NestData.newBuilder()
+                    .setChunk(ByteString.copyFrom(chunk))
+                    .setExtraContents(mapper.writeValueAsString(extra))
+                    .build()
+            )
+            .build()
+        this.onNext(dataRequest)
+    }
 }

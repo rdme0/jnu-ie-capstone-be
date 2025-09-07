@@ -1,37 +1,25 @@
 package jnu.ie.capstone.common.websocket.config
 
 import jnu.ie.capstone.common.security.config.AllowedOriginsProperties
-import jnu.ie.capstone.common.security.interceptor.WebSocketJwtAuthInterceptor
-import jnu.ie.capstone.common.websocket.exception.handler.WebSocketExceptionHandler
+import jnu.ie.capstone.common.websocket.interceptor.JwtAuthHandshakeInterceptor
+import jnu.ie.capstone.session.handler.KioskAiSessionHandler
 import org.springframework.context.annotation.Configuration
-import org.springframework.messaging.simp.config.ChannelRegistration
-import org.springframework.messaging.simp.config.MessageBrokerRegistry
-import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker
-import org.springframework.web.socket.config.annotation.StompEndpointRegistry
-import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer
+import org.springframework.web.socket.config.annotation.EnableWebSocket
+import org.springframework.web.socket.config.annotation.WebSocketConfigurer
+import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 
 @Configuration
-@EnableWebSocketMessageBroker
+@EnableWebSocket
 class WebSocketConfig(
     private val originsProperties: AllowedOriginsProperties,
-    private val authInterceptor: WebSocketJwtAuthInterceptor,
-    private val exceptionHandler: WebSocketExceptionHandler
-) : WebSocketMessageBrokerConfigurer {
+    private val authInterceptor: JwtAuthHandshakeInterceptor,
+    private val handler: KioskAiSessionHandler
+) : WebSocketConfigurer {
 
-    override fun registerStompEndpoints(registry: StompEndpointRegistry) {
-        registry.addEndpoint("/websocket/connect")
+    override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
+        registry.addHandler(handler, "/websocket/voice")
+            .addInterceptors(authInterceptor)
             .setAllowedOriginPatterns(*originsProperties.allowedFrontEndOrigins.toTypedArray())
-            .withSockJS()
-
-        registry.setErrorHandler(exceptionHandler)
-    }
-
-    override fun configureMessageBroker(registry: MessageBrokerRegistry) {
-        registry.enableSimpleBroker("/subscribe")
-    }
-
-    override fun configureClientInboundChannel(registration: ChannelRegistration) {
-        registration.interceptors(authInterceptor)
     }
 
 }
