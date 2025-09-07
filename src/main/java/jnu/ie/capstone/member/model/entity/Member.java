@@ -19,12 +19,13 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Embedded
-    @AttributeOverride(name = "value", column = @Column(name = "email", nullable = false))
+    @AttributeOverride(name = "value", column = @Column(name = "email", nullable = false, unique = true))
     private Email email;
 
     @Column(nullable = false)
