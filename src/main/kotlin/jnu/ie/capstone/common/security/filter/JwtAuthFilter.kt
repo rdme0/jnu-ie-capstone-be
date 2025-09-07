@@ -62,7 +62,6 @@ class JwtAuthFilter(
                 AuthenticationServiceException(CRITICAL_ERROR_MESSAGE.format("인증"), e)
             )
             SecurityContextHolder.clearContext()
-            throw e
         }
     }
 }
