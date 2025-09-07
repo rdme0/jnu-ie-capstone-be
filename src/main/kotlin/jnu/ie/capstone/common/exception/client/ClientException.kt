@@ -3,4 +3,4 @@ package jnu.ie.capstone.common.exception.client
 import jnu.ie.capstone.common.exception.BusinessException
 import jnu.ie.capstone.common.exception.enums.ErrorCode
 
-abstract class ClientException(val errorCode: ErrorCode) : BusinessException(errorCode)
+abstract class ClientException(errorCode: ErrorCode) : BusinessException(errorCode)
