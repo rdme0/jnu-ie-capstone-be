@@ -59,7 +59,7 @@ dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
 
     //kotlin coroutine
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.10.2'
+    implementation platform('org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.10.2')
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-reactor'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-jdk8'
@@ -82,7 +82,7 @@ dependencies {
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
     //jackson
-    implementation 'com.fasterxml.jackson.module:jackson-module-jsonSchema:2.19.2'
+    implementation 'com.fasterxml.jackson.module:jackson-module-jsonSchema'
 
     //PostgreSQL
     implementation 'org.postgresql:postgresql'
