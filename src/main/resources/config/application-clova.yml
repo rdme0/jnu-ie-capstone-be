@@ -1,0 +1,3 @@
+clova:
+  api-key: ${CLOVA_API_KEY}
+  speech-url: ${CLOVA_SPEECH_URL}

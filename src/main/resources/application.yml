@@ -1,0 +1,10 @@
+spring:
+  application.name: capstone
+  profiles.default: dev
+  config:
+    import:
+      - classpath:config/application-security.yml
+      - classpath:config/application-dev-db.yml
+      - classpath:config/application-gemini.yml
+      - classpath:config/application-clova.yml
+      - classpath:config/application-grpc.yml
