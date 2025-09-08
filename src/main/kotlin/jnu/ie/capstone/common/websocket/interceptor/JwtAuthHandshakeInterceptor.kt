@@ -4,7 +4,6 @@ import jnu.ie.capstone.common.exception.client.ClientException
 import jnu.ie.capstone.common.exception.client.UnauthorizedException
 import jnu.ie.capstone.common.security.helper.JwtAuthHelper
 import mu.KotlinLogging
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.server.ServerHttpRequest
 import org.springframework.http.server.ServerHttpResponse
