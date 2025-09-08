@@ -65,13 +65,12 @@ class ClovaSpeechService(
                     requestObserver.sendData(chunk, seqId++, false)
                 }
                 requestObserver.sendData(ByteArray(0), -1, true)
+                logger.info { "Clova Speech stream completed" }
+                requestObserver.onCompleted()
             } catch (e: Exception) {
                 logger.error(e) { "Error while collecting voice stream. Notifying server." }
                 requestObserver.onError(e)
                 throw e
-            } finally {
-                logger.info { "Client finished sending data. Closing request stream." }
-                requestObserver.onCompleted()
             }
         }
 
