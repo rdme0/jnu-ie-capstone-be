@@ -2,7 +2,6 @@ package jnu.ie.capstone.common.websocket.interceptor
 
 import jnu.ie.capstone.common.exception.client.ClientException
 import jnu.ie.capstone.common.exception.client.UnauthorizedException
-import jnu.ie.capstone.common.exception.enums.ErrorCode
 import jnu.ie.capstone.common.security.helper.JwtAuthHelper
 import mu.KotlinLogging
 import org.springframework.http.HttpHeaders
@@ -34,25 +33,24 @@ class JwtAuthHandshakeInterceptor(
         }
 
         try {
-            val authHeader = request.servletRequest.getHeader(HttpHeaders.AUTHORIZATION)
-            val auth: Authentication = helper.authenticate(authHeader)
+            //Sec WebSocket Protocol의 본래의 용도가 아니지만 쿼리 string에 넣기에는 토큰 만료시간이 길어서 보안상 이렇게 해 둠 (refresh token은 mvp에 없음)
+            val subProtocols = request.headers["Sec-WebSocket-Protocol"]
+            val bearerToken = subProtocols?.firstOrNull() ?: return false
+            val auth: Authentication = helper.authenticate(bearerToken)
 
             attributes["principal"] = auth
             logger.info { "WebSocket 핸드셰이크 인증 성공: User=${auth.name}" }
+            response.headers.add("Sec-WebSocket-Protocol", bearerToken)
 
             return true
         } catch (ex: Exception) {
             val cause = ex.cause ?: ex
             logger.warn { "WebSocket 핸드셰이크 인증 실패: ${cause.message}" }
 
-            response.setStatusCode(HttpStatus.UNAUTHORIZED)
-
-            val errorMessage = when (cause) {
-                is UnauthorizedException, is ClientException -> cause.message
-                else -> ErrorCode.INTERNAL_SERVER.message
+            when (cause) {
+                is UnauthorizedException, is ClientException -> response.setStatusCode(HttpStatus.UNAUTHORIZED)
+                else -> response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR)
             }
-
-            response.body.write(errorMessage?.toByteArray())
 
             return false
         }
@@ -64,6 +62,5 @@ class JwtAuthHandshakeInterceptor(
         wsHandler: WebSocketHandler,
         exception: Exception?
     ) {
-
     }
 }
