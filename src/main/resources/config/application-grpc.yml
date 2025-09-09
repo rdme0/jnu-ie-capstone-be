@@ -1,5 +1,0 @@
-spring.grpc:
-  client:
-    default-channel:
-      address: static://${clova.speech-url}
-      negotiation-type: TLS

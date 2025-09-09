@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jnu.ie.capstone.common.constant.CommonConstants.CRITICAL_ERROR_MESSAGE
+import jnu.ie.capstone.common.security.constants.SecurityConstants.AUTHORIZATION_HEADER
 import jnu.ie.capstone.common.security.exception.handler.Rest401Handler
 import jnu.ie.capstone.common.security.exception.handler.Rest500Handler
 import jnu.ie.capstone.common.security.helper.JwtAuthHelper
@@ -24,14 +25,14 @@ class JwtAuthFilter(
 ) : OncePerRequestFilter() {
 
     companion object {
-        private const val AUTHORIZATION_HEADER = "Authorization"
         private val WHITELIST = setOf(
             "/h2-console/**",
             "/auth/success",
             "/error",
             "/favicon.ico",
             "/oauth2/authorization/**",
-            "/login/**"
+            "/login/**",
+            "/websocket/voice/**"
         )
         private val pathMatcher: AntPathMatcher = AntPathMatcher()
     }

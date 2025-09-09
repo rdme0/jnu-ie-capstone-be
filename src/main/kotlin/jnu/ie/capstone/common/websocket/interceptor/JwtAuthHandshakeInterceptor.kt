@@ -33,8 +33,14 @@ class JwtAuthHandshakeInterceptor(
 
         try {
             //Sec WebSocket Protocol의 본래의 용도가 아니지만 쿼리 string에 넣기에는 토큰 만료시간이 길어서 보안상 이렇게 해 둠 (refresh token은 mvp에 없음)
-            val subProtocols = request.headers["Sec-WebSocket-Protocol"]
-            val bearerToken = subProtocols?.firstOrNull() ?: return false
+            val subProtocol = request.headers.getFirst("Sec-WebSocket-Protocol")
+
+            val bearerToken = subProtocol
+                ?.split(",")
+                ?.map { it.trim() }
+                ?.firstOrNull { it.startsWith("Bearer ") }
+                ?: throw UnauthorizedException()
+
             val auth: Authentication = helper.authenticate(bearerToken)
 
             attributes["principal"] = auth
@@ -44,10 +50,16 @@ class JwtAuthHandshakeInterceptor(
             return true
         } catch (ex: Exception) {
             val cause = ex.cause ?: ex
-            logger.warn { "WebSocket 핸드셰이크 인증 실패: ${cause.message}" }
+            logger.warn {
+                "WebSocket 핸드셰이크 인증 실패: ${cause.message}, headers=${request.headers}, uri=${request.uri}"
+            }
 
             when (cause) {
-                is UnauthorizedException, is ClientException -> response.setStatusCode(HttpStatus.UNAUTHORIZED)
+                is UnauthorizedException, is ClientException -> {
+                    response.setStatusCode(HttpStatus.UNAUTHORIZED)
+                    response.headers.add("WWW-Authenticate", "Bearer")
+                }
+
                 else -> response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR)
             }
 
