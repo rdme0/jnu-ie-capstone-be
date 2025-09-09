@@ -16,6 +16,7 @@ class RtzrAccessTokenService(
 
     fun get() = repository.findById(ID).getOrNull()?.value
 
+    //todo: 동시성 제어
     fun overwrite(token: String) : String {
         val entity = RtzrAccessToken(ID, token)
         return repository.save(entity).value
