@@ -35,9 +35,9 @@ class KioskAiSessionHandler(
 
         sessionScope.launch {
             try {
-                kioskAiSessionService.processVoiceChunk(clientVoiceStream)
+                kioskAiSessionService.processVoiceChunk(clientVoiceStream, sessionScope)
             } catch (_: CancellationException) {
-                logger.info { "세션 ${session.id} 처리 취소" }
+                logger.info { "세션 ${session.id} 처리가 정상적으로 취소되었습니다." }
             } catch (e: Exception) {
                 logger.error(e) { "voice chunk 처리 중 에러 -> ${session.id}" }
             }
@@ -48,7 +48,8 @@ class KioskAiSessionHandler(
     }
 
     override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
-        val clientVoiceStream = session.attributes["clientVoiceStream"] as? MutableSharedFlow<ByteArray>
+        val clientVoiceStream =
+            session.attributes["clientVoiceStream"] as? MutableSharedFlow<ByteArray>
 
         val bytes = ByteArray(message.payload.remaining())
         message.payload.get(bytes)
