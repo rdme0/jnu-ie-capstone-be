@@ -7,5 +7,4 @@ spring:
       - classpath:config/application-dev-db.yml
       - classpath:config/application-gemini.yml
       - classpath:config/application-rtzr.yml
-      - classpath:config/application-grpc.yml
       - classpath:config/application-dev-redis.yml
