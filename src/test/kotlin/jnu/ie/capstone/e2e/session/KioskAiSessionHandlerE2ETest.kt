@@ -44,8 +44,9 @@ class KioskAiSessionHandlerE2ETest(
 
     @BeforeEach
     fun setUp() {
-        val member = memberService.get(1)
-        token = jwtUtil.generateToken(member!!)
+        val member = memberService.get(1L)
+        requireNotNull(member) { "테스트 member가 없습니다." }
+        token = jwtUtil.generateToken(member)
     }
 
     @AfterEach
