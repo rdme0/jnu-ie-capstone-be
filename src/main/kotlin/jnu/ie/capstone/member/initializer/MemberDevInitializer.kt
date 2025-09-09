@@ -14,15 +14,21 @@ import org.springframework.stereotype.Component
 class MemberDevInitializer(
     private val memberRepository: MemberRepository
 ) {
+    private companion object {
+        private val TEST_EMAIL = Email("Test@Test.com")
+    }
 
     @EventListener(ApplicationReadyEvent::class)
     fun init() {
-        val testMember = Member.builder()
-            .provider(Oauth2Provider.KAKAO)
-            .email(Email("Test@Test.com"))
-            .build()
+        memberRepository.findByEmail(TEST_EMAIL)
+            ?: run {
+                val testMember = Member.builder()
+                    .provider(Oauth2Provider.KAKAO)
+                    .email(TEST_EMAIL)
+                    .build()
 
-        memberRepository.save(testMember)
+                memberRepository.save(testMember)
+            }
     }
 
 }
