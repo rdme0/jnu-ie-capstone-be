@@ -57,7 +57,13 @@ class SecurityConfig(
         return http.headers { it.frameOptions { it.sameOrigin() } }
             .cors { it.configurationSource(corsConfigurationSource()) }
             .authorizeHttpRequests {
-                it.requestMatchers("/h2-console/**", "/auth/success", "/error", "/favicon.ico")
+                it.requestMatchers(
+                    "/h2-console/**",
+                    "/auth/success",
+                    "/error",
+                    "/favicon.ico",
+                    "/websocket/voice/**"
+                )
                     .permitAll()
                     .anyRequest().authenticated()
             }
