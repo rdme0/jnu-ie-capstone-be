@@ -1,13 +1,19 @@
 package jnu.ie.capstone.rtzr.client.handler
 
-import kotlinx.coroutines.channels.SendChannel
 import mu.KotlinLogging
+import kotlinx.coroutines.channels.SendChannel
+import org.springframework.stereotype.Component
+import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.web.socket.WebSocketSession
+import jnu.ie.capstone.rtzr.dto.client.response.RtzrSttResponse
 import org.springframework.web.socket.handler.TextWebSocketHandler
 
-internal class RtzrSttWebSocketHandler(
-    private val resultsChannel: SendChannel<String>
+@Component
+class RtzrSttWebSocketHandler(
+    private val rtzrChannel: SendChannel<RtzrSttResponse>,
+    private val mapper: ObjectMapper
 ) : TextWebSocketHandler() {
 
     private val logger = KotlinLogging.logger {}
@@ -17,21 +23,21 @@ internal class RtzrSttWebSocketHandler(
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
-        val result = message.payload
-        logger.debug { "STT 결과 수신: $result" }
-        resultsChannel.trySend(result)
+        val result = mapper.readValue(message.payload, RtzrSttResponse::class.java)
+        logger.debug { "STT 결과 수신 -> $result" }
+        rtzrChannel.trySend(result)
     }
 
     override fun afterConnectionClosed(
         session: WebSocketSession,
-        status: org.springframework.web.socket.CloseStatus
+        status: CloseStatus
     ) {
         logger.info { "RTZR STT 연결 종료 -> ${session.id}, Status: $status" }
-        resultsChannel.close()
+        rtzrChannel.close()
     }
 
     override fun handleTransportError(session: WebSocketSession, exception: Throwable) {
         logger.error(exception) { "RTZR STT 연결 에러: ${session.id}" }
-        resultsChannel.close(exception)
+        rtzrChannel.close(exception)
     }
 }

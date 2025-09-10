@@ -85,6 +85,7 @@ dependencies {
 
     //jackson
     implementation 'com.fasterxml.jackson.module:jackson-module-jsonSchema'
+    implementation 'com.fasterxml.jackson.module:jackson-module-kotlin'
 
     //PostgreSQL
     implementation 'org.postgresql:postgresql'

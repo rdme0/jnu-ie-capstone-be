@@ -1,13 +1,11 @@
 package jnu.ie.capstone.rtzr.client
 
-import jakarta.websocket.DeploymentException
 import jnu.ie.capstone.rtzr.client.handler.RtzrSttWebSocketHandler
 import jnu.ie.capstone.rtzr.config.RtzrConfig
 import jnu.ie.capstone.rtzr.dto.client.response.RtzrAuthResponse
+import jnu.ie.capstone.rtzr.dto.client.response.RtzrSttResponse
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.future.await
@@ -29,11 +27,12 @@ import java.net.URI
 
 @Component
 class RtzrSttClient(
-    private val config: RtzrConfig
+    private val config: RtzrConfig,
+    private val handler: RtzrSttWebSocketHandler,
+    private val rtzrChannel: ReceiveChannel<RtzrSttResponse>
 ) {
-    companion object {
-        private const val BUFFER_SIZE = 512
-        private val END_OF_STREAM = TextMessage("EOS")
+    private companion object {
+        val END_OF_STREAM = TextMessage("EOS")
     }
 
     private val logger = KotlinLogging.logger {}
@@ -54,20 +53,14 @@ class RtzrSttClient(
         voiceStream: Flow<ByteArray>,
         accessToken: String,
         scope: CoroutineScope
-    ): Flow<String> {
+    ): Flow<RtzrSttResponse> {
 
-        val resultsChannel = Channel<String>(
-            capacity = BUFFER_SIZE,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST
-        )
-
-        val sessionFuture = wsClient.execute(
-            RtzrSttWebSocketHandler(resultsChannel),
+        val session = wsClient.execute(
+            handler,
             getWebSocketHeader(config, accessToken),
             getUriWithQueryParams(config).toUri()
-        )
+        ).await()
 
-        val session = sessionFuture.await()
         scope.launch {
             try {
                 voiceStream.collect { chunk ->
@@ -79,7 +72,7 @@ class RtzrSttClient(
                 session.close()
             }
         }
-        return resultsChannel.consumeAsFlow()
+        return rtzrChannel.consumeAsFlow()
     }
 
     private fun getAuthBody(): LinkedMultiValueMap<String, String> {
@@ -104,6 +97,4 @@ class RtzrSttClient(
         headers.add("Authorization", "Bearer $accessToken")
         return headers
     }
-
-
 }

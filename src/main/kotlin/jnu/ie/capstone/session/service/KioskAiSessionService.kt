@@ -12,9 +12,10 @@ private val logger = KotlinLogging.logger {}
 class KioskAiSessionService(
     private val sttService: RtzrSttService
 ) {
+
     suspend fun processVoiceChunk(voiceStream: Flow<ByteArray>, scope: CoroutineScope) {
         val result = sttService.stt(voiceStream, scope)
-            .collect { result -> logger.info { "변환된 text chunk -> $result" } }
+            .collect { result -> logger.info { "변환된 chunk dto -> $result" } }
     }
 
 }
