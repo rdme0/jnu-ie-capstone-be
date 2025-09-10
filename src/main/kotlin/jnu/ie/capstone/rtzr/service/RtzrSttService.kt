@@ -4,6 +4,7 @@ import jakarta.websocket.DeploymentException
 import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.rtzr.cache.service.RtzrAccessTokenService
 import jnu.ie.capstone.rtzr.client.RtzrSttClient
+import jnu.ie.capstone.rtzr.dto.client.response.RtzrSttResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import mu.KotlinLogging
@@ -20,7 +21,7 @@ class RtzrSttService(
 
     private val logger = KotlinLogging.logger {}
 
-    suspend fun stt(voiceStream: Flow<ByteArray>, scope: CoroutineScope): Flow<String> {
+    suspend fun stt(voiceStream: Flow<ByteArray>, scope: CoroutineScope): Flow<RtzrSttResponse> {
         var accessToken: String = cacheService.get()
             ?: cacheService.overwrite(client.auth().accessToken)
 
