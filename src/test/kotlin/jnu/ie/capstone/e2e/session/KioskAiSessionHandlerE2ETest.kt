@@ -3,7 +3,9 @@ package jnu.ie.capstone.e2e.session
 import jnu.ie.capstone.Application
 import jnu.ie.capstone.common.security.util.JwtUtil
 import jnu.ie.capstone.member.service.MemberCoordinateService
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -15,7 +17,9 @@ import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.core.io.ResourceLoader
 import org.springframework.test.context.TestConstructor
 import org.springframework.test.context.junit.jupiter.SpringExtension
-import org.springframework.web.socket.*
+import org.springframework.web.socket.BinaryMessage
+import org.springframework.web.socket.WebSocketHttpHeaders
+import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.client.standard.StandardWebSocketClient
 import org.springframework.web.socket.handler.BinaryWebSocketHandler
 import java.net.URI
@@ -100,6 +104,6 @@ class KioskAiSessionHandlerE2ETest(
             session.close()
         }
 
-        logger.info{ "stt 끝" }
+        logger.info { "stt 끝" }
     }
 }
