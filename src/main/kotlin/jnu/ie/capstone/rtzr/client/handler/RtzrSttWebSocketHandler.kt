@@ -6,9 +6,10 @@ import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.springframework.web.socket.WebSocketSession
 import jnu.ie.capstone.rtzr.dto.client.response.RtzrSttResponse
+import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
+import kotlin.jvm.java
 
 @Component
 class RtzrSttWebSocketHandler(
