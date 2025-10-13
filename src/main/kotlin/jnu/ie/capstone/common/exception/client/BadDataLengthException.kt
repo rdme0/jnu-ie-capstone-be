@@ -1,6 +1,6 @@
-package jnu.ie.capstone.common.exception.client;
+package jnu.ie.capstone.common.exception.client
 
-import jnu.ie.capstone.common.exception.enums.ErrorCode;
+import jnu.ie.capstone.common.exception.enums.ErrorCode
 
 class BadDataLengthException(
     private val fieldName: String?,

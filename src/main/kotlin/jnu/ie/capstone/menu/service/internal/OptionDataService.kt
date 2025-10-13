@@ -1,11 +1,9 @@
 package jnu.ie.capstone.menu.service.internal
 
-import jnu.ie.capstone.menu.model.entity.Menu
 import jnu.ie.capstone.menu.model.entity.Option
 import jnu.ie.capstone.menu.repository.OptionRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.awt.SystemColor.menu
 
 @Service
 class OptionDataService(

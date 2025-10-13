@@ -1,8 +1,6 @@
 package jnu.ie.capstone.menu.dto.response.internal
 
 import jnu.ie.capstone.menu.model.entity.Option
-import jnu.ie.capstone.menu.model.vo.OptionName
-import jnu.ie.capstone.menu.model.vo.Price
 
 data class OptionResponseDTO(
     val id: Long,

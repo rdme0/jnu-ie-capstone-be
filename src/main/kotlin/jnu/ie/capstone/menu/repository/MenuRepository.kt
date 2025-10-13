@@ -1,6 +1,5 @@
 package jnu.ie.capstone.menu.repository
 
-import jnu.ie.capstone.member.model.entity.Member
 import jnu.ie.capstone.menu.model.entity.Menu
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
