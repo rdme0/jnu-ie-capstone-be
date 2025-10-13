@@ -62,7 +62,8 @@ class SecurityConfig(
                     "/auth/success",
                     "/error",
                     "/favicon.ico",
-                    "/websocket/voice/**"
+                    "/websocket/voice/**",
+                    "/store/**"
                 )
                     .permitAll()
                     .anyRequest().authenticated()
