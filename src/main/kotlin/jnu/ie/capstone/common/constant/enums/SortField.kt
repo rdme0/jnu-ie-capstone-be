@@ -1,4 +1,4 @@
-package jnu.ie.capstone.common.constant.enums;
+package jnu.ie.capstone.common.constant.enums
 
 enum class SortField(
         val requestField: String,
