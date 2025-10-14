@@ -1,4 +1,4 @@
-package jnu.ie.capstone.menu.dto.internal
+package jnu.ie.capstone.menu.dto.internal.interfaces
 
 import jnu.ie.capstone.menu.model.vo.MenuName
 import jnu.ie.capstone.menu.model.vo.Price
