@@ -1,5 +1,6 @@
 package jnu.ie.capstone.session.handler
 
+import jnu.ie.capstone.common.security.dto.KioskUserDetails
 import jnu.ie.capstone.session.service.KioskAiSessionService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -9,6 +10,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.BinaryMessage
 import org.springframework.web.socket.CloseStatus
@@ -33,9 +35,28 @@ class KioskAiSessionHandler(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
+        val authentication = session.principal as? UsernamePasswordAuthenticationToken
+
+        val userDetails = authentication?.principal as? KioskUserDetails
+            ?: run {
+                logger.error { "올바르지 않은 authentication -> ${session.principal}" }
+                return
+            }
+
+        val storeId = session.attributes["storeId"] as? Long
+            ?: run {
+                logger.error { "올바르지 않은 storeId -> ${session.attributes["storeId"]}" }
+                return
+            }
+
         sessionScope.launch {
             try {
-                kioskAiSessionService.processVoiceChunk(clientVoiceStream, sessionScope)
+                kioskAiSessionService.processVoiceChunk(
+                    clientVoiceStream,
+                    storeId,
+                    userDetails.memberInfo,
+                    session
+                )
             } catch (_: CancellationException) {
                 logger.info { "세션 ${session.id} 처리가 정상적으로 취소되었습니다." }
             } catch (e: Exception) {
