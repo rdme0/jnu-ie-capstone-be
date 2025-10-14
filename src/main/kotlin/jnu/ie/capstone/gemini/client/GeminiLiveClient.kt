@@ -1,14 +1,17 @@
 package jnu.ie.capstone.gemini.client
 
-import com.google.common.collect.ImmutableList
 import com.google.genai.AsyncSession
 import com.google.genai.Client
 import com.google.genai.types.*
 import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.gemini.config.GeminiConfig
 import jnu.ie.capstone.gemini.dto.client.request.GeminiInput
-import jnu.ie.capstone.gemini.dto.client.response.GeminiLiveResponse
-import jnu.ie.capstone.gemini.enums.GeminiModel
+import jnu.ie.capstone.gemini.dto.client.response.GeminiOutput
+import jnu.ie.capstone.gemini.constant.enums.GeminiModel
+import jnu.ie.capstone.gemini.constant.enums.GeminiVoice
+import jnu.ie.capstone.gemini.constant.function.GeminiFunction
+import jnu.ie.capstone.gemini.dto.client.internal.Context
+import jnu.ie.capstone.session.enums.SessionEvent
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -25,9 +28,6 @@ class GeminiLiveClient(
 
     companion object {
         private val logger = KotlinLogging.logger {}
-        private val googleSearchTool = Tool.builder()
-            .googleSearch(GoogleSearch.builder().build())
-            .build()
     }
 
     private val client = Client.builder().apiKey(config.apiKey).build()
@@ -36,19 +36,19 @@ class GeminiLiveClient(
         inputData: Flow<GeminiInput>,
         prompt: String,
         model: GeminiModel = GeminiModel.GEMINI_2_5_FLASH_LIVE
-    ): Flow<GeminiLiveResponse>? {
+    ): Flow<GeminiOutput> {
         return try {
             callbackFlow {
                 val session = client.async.live
-                    .connect(model.toString(), buildConfig(prompt))
+                    .connect(model.text, buildLiveConnectConfig(prompt))
                     .await()
 
                 logger.debug { "Gemini Live 세션이 연결되었습니다." }
 
                 val inputSTTBuffer = StringBuilder()
-                val outputBuffer = StringBuilder()
+                val outputSTTBuffer = StringBuilder()
 
-                session.receive { onMessageReceived(message = it, inputSTTBuffer, outputBuffer) }
+                session.receive { onMessageReceived(it, inputSTTBuffer, outputSTTBuffer) }
                 launch { send(inputData, session) }
                 awaitClose { onClosed(session) }
             }
@@ -57,46 +57,82 @@ class GeminiLiveClient(
         }
     }
 
-    private fun buildConfig(prompt: String): LiveConnectConfig {
+    private fun buildLiveConnectConfig(prompt: String): LiveConnectConfig {
         return LiveConnectConfig.builder()
-            .responseModalities(Modality.Known.TEXT)
+            .tools(GeminiFunction.STATEMACHINE_TOOL)
+            .responseModalities(Modality.Known.AUDIO)
             .inputAudioTranscription(AudioTranscriptionConfig.builder().build())
+            .outputAudioTranscription(AudioTranscriptionConfig.builder().build())
             .realtimeInputConfig(buildRealTimeInputConfig())
             .systemInstruction(Content.fromParts(Part.fromText(prompt)))
-            .tools(ImmutableList.of(googleSearchTool))
+            .speechConfig(
+                SpeechConfig.builder().voiceConfig(
+                    VoiceConfig.builder().prebuiltVoiceConfig(
+                        PrebuiltVoiceConfig.builder().voiceName(GeminiVoice.ZEPHYR.text).build()
+                    )
+                )
+            )
             .build()
     }
 
-    private fun ProducerScope<GeminiLiveResponse>.onMessageReceived(
+    private fun ProducerScope<GeminiOutput>.onMessageReceived(
         message: LiveServerMessage,
         inputSTTBuffer: StringBuilder,
-        outputBuffer: StringBuilder
+        outputSTTBuffer: StringBuilder
     ) {
         logger.debug { "gemini received -> $message" }
 
         message.serverContent().flatMap { it.inputTranscription() }
             .ifPresent {
-                it.text().ifPresent { inputSTTChunk -> inputSTTBuffer.append(inputSTTChunk) }
+                it.text()
+                    .ifPresent { inputSTTChunk ->
+                        inputSTTBuffer.append(inputSTTChunk)
+                        trySend(GeminiOutput.InputSTT(inputSTTChunk))
+                    }
+            }
+
+        message.serverContent().flatMap { it.outputTranscription() }
+            .ifPresent {
+                it.text()
+                    .ifPresent { outputSTTChunk ->
+                        outputSTTBuffer.append(outputSTTChunk)
+                        trySend(GeminiOutput.OutputSTT(outputSTTChunk))
+                    }
             }
 
         message.serverContent().flatMap { it.modelTurn() }.flatMap { it.parts() }
             .ifPresent { parts ->
                 parts.forEach {
-                    it.text().ifPresent { outputChunk -> outputBuffer.append(outputChunk) }
+                    it.functionCall()
+                        .map { call -> call.name()?.get() }
+                        .map { functionName -> SessionEvent.fromText(functionName) }
+                        .ifPresent { event -> trySend(GeminiOutput.OutputFunction(event)) }
                 }
             }
 
-        if (message.serverContent().flatMap { it.turnComplete() }.orElse(false)) {
-            val finalInput = inputSTTBuffer.toString()
-            val finalOutput = outputBuffer.toString()
+        message.serverContent().flatMap { it.modelTurn() }.flatMap { it.parts() }
+            .ifPresent { parts ->
+                parts.forEach {
+                    it.inlineData()
+                        .map { blob -> blob.data()?.get() }
+                        .ifPresent { data -> trySend(GeminiOutput.OutputVoiceStream(data)) }
+                }
+            }
 
-            logger.debug { "서버가 대답을 완료했습니다. STT: [$finalInput], Response: [$finalOutput]" }
+        val isGeminiTurnComplete = message.serverContent().flatMap { it.turnComplete() }
+            .orElse(false)
 
-            if (finalInput.isNotEmpty() || finalOutput.isNotEmpty())
-                trySend(GeminiLiveResponse(finalInput, finalOutput))
+        if (isGeminiTurnComplete) {
+            val finalInputSTT = inputSTTBuffer.toString()
+            val finalOutputSTT = outputSTTBuffer.toString()
+
+            logger.debug { "gemini가 대답을 완료했습니다. input STT: [$finalInputSTT], output STT: [$finalOutputSTT]" }
+
+            if (finalInputSTT.isNotEmpty() || finalOutputSTT.isNotEmpty())
+                trySend(GeminiOutput.EndOfGeminiTurn(finalInputSTT, finalOutputSTT))
 
             inputSTTBuffer.clear()
-            outputBuffer.clear()
+            outputSTTBuffer.clear()
         }
     }
 
@@ -104,20 +140,19 @@ class GeminiLiveClient(
         inputData: Flow<GeminiInput>,
         session: AsyncSession
     ) {
-        inputData.collect { data ->
-
-            when (data) {
+        inputData.collect {
+            when (it) {
                 is GeminiInput.Audio -> {
-                    session.sendRealtimeInput(buildAudioContent(data.chunk))
-                        .exceptionally {
-                            logger.error(it) { "audio chunk 보내는 중 에러 발생 -> ${it.message}" }
+                    session.sendRealtimeInput(buildAudioContent(it.chunk))
+                        .exceptionally { exception ->
+                            logger.error(exception) { "audio chunk 보내는 중 에러 발생 -> ${exception.message}" }
                             return@exceptionally null
                         }.await()
                 }
 
-                is GeminiInput.Context -> {
+                is GeminiInput.Text -> {
                     session.sendRealtimeInput(
-                        buildTextContent(data.shortTermMemory, data.longTermMemory)
+                        buildTextContent(it.context)
                     ).exceptionally {
                         logger.error(it) { "audio chunk 보내는 중 에러 발생 -> ${it.message}" }
                         return@exceptionally null
@@ -142,20 +177,15 @@ class GeminiLiveClient(
             .build()
     }
 
-    private fun buildAudioContent(
-        voiceChunk: ByteArray,
-    ): LiveSendRealtimeInputParameters {
+    private fun buildAudioContent(voiceChunk: ByteArray): LiveSendRealtimeInputParameters {
         return LiveSendRealtimeInputParameters.builder()
             .audio(Blob.builder().mimeType("audio/pcm").data(voiceChunk))
             .build()
     }
 
-    private fun buildTextContent(
-        shortTermMemory: String,
-        longTermMemory: String
-    ): LiveSendRealtimeInputParameters {
+    private fun buildTextContent(context: Context): LiveSendRealtimeInputParameters {
         return LiveSendRealtimeInputParameters.builder()
-            .text("shortTermMemory: $shortTermMemory, longTermMemory: $longTermMemory")
+            .text(context.toString())
             .build()
     }
 
