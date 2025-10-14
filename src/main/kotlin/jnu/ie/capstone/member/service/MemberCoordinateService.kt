@@ -29,7 +29,9 @@ class MemberCoordinateService(
 
     @Transactional(readOnly = true)
     fun get(id: Long): MemberInfo? {
-        val member = dataService.get(id) ?: return null
-        return MemberInfo.from(member)
+        return MemberInfo.from(getEntity(id) ?: return null)
     }
+
+    @Transactional(readOnly = true)
+    fun getEntity(id: Long): Member? = dataService.get(id)
 }

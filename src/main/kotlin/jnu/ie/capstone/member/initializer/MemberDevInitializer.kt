@@ -1,23 +1,21 @@
 package jnu.ie.capstone.member.initializer
 
+import jnu.ie.capstone.member.constant.MemberConstant.TEST_EMAIL
 import jnu.ie.capstone.member.model.entity.Member
 import jnu.ie.capstone.member.model.entity.Oauth2Provider
-import jnu.ie.capstone.member.model.vo.Email
 import jnu.ie.capstone.member.repository.MemberRepository
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Profile
 import org.springframework.context.event.EventListener
+import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 
 @Component
+@Order(1)
 @Profile("dev")
 class MemberDevInitializer(
     private val memberRepository: MemberRepository
 ) {
-    private companion object {
-        private val TEST_EMAIL = Email("Test@Test.com")
-    }
-
     @EventListener(ApplicationReadyEvent::class)
     fun init() {
         memberRepository.findByEmail(TEST_EMAIL)
