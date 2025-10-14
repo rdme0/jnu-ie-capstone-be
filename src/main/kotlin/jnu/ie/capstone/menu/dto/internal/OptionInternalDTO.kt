@@ -28,9 +28,9 @@ data class OptionInternalDTO(
 
     override fun toString(): String {
         return """
-            옵션 id : '${id}'
-            옵션 이름 : '${name}'
-            옵션 가격 : '${price}
+            옵션 id : $id
+            옵션 이름 : $name
+            옵션 가격 : $price
         """.trimIndent()
     }
 }
