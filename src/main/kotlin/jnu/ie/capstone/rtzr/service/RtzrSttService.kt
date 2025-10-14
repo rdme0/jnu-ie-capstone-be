@@ -23,7 +23,7 @@ class RtzrSttService(
 
     private val logger = KotlinLogging.logger {}
 
-    fun stt(voiceStream: Flow<ByteArray>, scope: CoroutineScope): Flow<RtzrSttResponse> {
+    suspend fun stt(voiceStream: Flow<ByteArray>, scope: CoroutineScope): Flow<RtzrSttResponse> {
         return flow {
             var accessToken: String = cacheService.get()
                 ?: cacheService.overwrite(client.auth().accessToken)
