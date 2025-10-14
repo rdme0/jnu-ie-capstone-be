@@ -61,9 +61,7 @@ class SecurityConfig(
                     "/h2-console/**",
                     "/auth/success",
                     "/error",
-                    "/favicon.ico",
-                    "/websocket/voice/**",
-                    "/store/**"
+                    "/favicon.ico"
                 )
                     .permitAll()
                     .anyRequest().authenticated()
