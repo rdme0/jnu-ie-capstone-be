@@ -1,4 +1,4 @@
-package jnu.ie.capstone.gemini.enums
+package jnu.ie.capstone.gemini.constant.enums
 
 enum class GeminiModel(val text: String) {
     GEMINI_EMBEDDING_001("gemini-embedding-001"),
