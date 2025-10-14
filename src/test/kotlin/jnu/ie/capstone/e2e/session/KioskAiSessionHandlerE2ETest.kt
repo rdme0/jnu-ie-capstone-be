@@ -1,14 +1,12 @@
 package jnu.ie.capstone.e2e.session
 
 import jnu.ie.capstone.Application
-import jnu.ie.capstone.common.security.util.JwtUtil
-import jnu.ie.capstone.member.service.MemberCoordinateService
+import jnu.ie.capstone.gemini.config.GeminiConfig
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -37,20 +35,16 @@ private val logger = KotlinLogging.logger {}
 class KioskAiSessionHandlerE2ETest(
     @param:LocalServerPort
     private var port: Int,
-    private val memberService: MemberCoordinateService,
-    private val jwtUtil: JwtUtil,
-    private val resourceLoader: ResourceLoader
+    private val resourceLoader: ResourceLoader,
+    private val geminiConfig: GeminiConfig
 ) {
+
+    private companion object {
+        const val STORE_ID = 1
+    }
+
     private val client = StandardWebSocketClient()
     private val receivedMessages = ArrayBlockingQueue<ByteArray>(10)
-    private lateinit var token: String
-
-    @BeforeEach
-    fun setUp() {
-        val member = memberService.get(1L)
-        requireNotNull(member) { "테스트 member가 없습니다." }
-        token = jwtUtil.generateToken(member)
-    }
 
     @AfterEach
     fun tearDown() {
@@ -62,48 +56,92 @@ class KioskAiSessionHandlerE2ETest(
     fun e2e() {
         val latch = CompletableDeferred<Unit>()
         val headers = WebSocketHttpHeaders()
-        headers.add("Sec-WebSocket-Protocol", "Bearer $token")
-        val session = client.execute(object : BinaryWebSocketHandler() {
-            override fun afterConnectionEstablished(session: WebSocketSession) {
-                latch.complete(Unit)
-            }
-
-            override fun handleBinaryMessage(
-                session: WebSocketSession,
-                message: BinaryMessage
-            ) {
-                val bytes = ByteArray(message.payload.remaining())
-                message.payload.get(bytes)
-                receivedMessages.offer(bytes)
-            }
-        }, headers, URI("ws://localhost:${port}/websocket/voice"))
-            .get(3, TimeUnit.SECONDS)
+        val session = getSession(latch, headers)
 
         runBlocking {
             latch.await()
 
-            // https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&aihubDataSe=realm&dataSetSn=123
-            val resource = resourceLoader.getResource("classpath:test/sst-test.wav")
-
+            val resource = resourceLoader.getResource("classpath:test/e2e-test.wav")
+            val inputStream = resource.inputStream
+            val totalBytes = inputStream.available()
+            val halfwayPoint = totalBytes / 2
             val buffer = ByteArray(3200)
 
-            resource.inputStream.use { stream ->
-                while (true) {
-                    val bytesRead = stream.read(buffer)
-                    if (bytesRead <= 0) break
+            var bytesSent = 0
+            // 1. 파일의 절반까지만 전송
+            while (bytesSent < halfwayPoint) {
+                val bytesRead = inputStream.read(buffer)
+                if (bytesRead <= 0) break
 
-                    val chunkToSend =
-                        if (bytesRead < buffer.size) buffer.copyOf(bytesRead) else buffer
-                    session.sendMessage(BinaryMessage(chunkToSend))
-
-                    delay(100)
-                }
+                val chunkToSend = buffer.copyOf(bytesRead)
+                session.sendMessage(BinaryMessage(chunkToSend))
+                bytesSent += bytesRead
+                delay(100)
             }
-            delay(10000)
+
+            // 2. 중간 침묵
+            val silenceMs = geminiConfig.silenceDurationMs.toLong() + 1000L
+            val silentChunk = ByteArray(buffer.size)
+            val silenceIterations = silenceMs / 100
+
+            logger.info { "음성 스트리밍 중간 지점 도달" }
+//            sendSilence(silenceIterations, session, silentChunk, silenceMs)
+
+
+            // 3. 나머지 파일 전송
+            while (true) {
+                val bytesRead = inputStream.read(buffer)
+                if (bytesRead <= 0) break
+
+                val chunkToSend = buffer.copyOf(bytesRead)
+                session.sendMessage(BinaryMessage(chunkToSend))
+                delay(100)
+            }
+
+            // 4. 끝 침묵
+            logger.info { "음성 스트리밍 끝 지점 도달" }
+            sendSilence(silenceIterations, session, silentChunk, silenceMs)
+
+            // 5. 마무리
             logger.info { "음성 스트리밍 끝!" }
+            delay(10000)
             session.close()
         }
+        logger.info { "음성 스트리밍 e2e 끝" }
+    }
 
-        logger.info { "stt 끝" }
+    private fun getSession(
+        latch: CompletableDeferred<Unit>,
+        headers: WebSocketHttpHeaders
+    ): WebSocketSession = client.execute(object : BinaryWebSocketHandler() {
+        override fun afterConnectionEstablished(session: WebSocketSession) {
+            latch.complete(Unit)
+        }
+
+        override fun handleBinaryMessage(
+            session: WebSocketSession,
+            message: BinaryMessage
+        ) {
+            val bytes = ByteArray(message.payload.remaining())
+            message.payload.get(bytes)
+            receivedMessages.offer(bytes)
+        }
+    }, headers, URI("ws://localhost:${port}/websocket/voice?storeId=${STORE_ID}"))
+        .get(3, TimeUnit.SECONDS)
+
+    private suspend fun sendSilence(
+        silenceIterations: Long,
+        session: WebSocketSession,
+        silentChunk: ByteArray,
+        silenceMs: Long
+    ) {
+        logger.info { "${silenceMs / 1000}초간 침묵 스트림 전송 시작" }
+
+        repeat(silenceIterations.toInt()) {
+            session.sendMessage(BinaryMessage(silentChunk))
+            delay(100)
+        }
+
+        logger.info { "${silenceMs / 1000}초 침묵 스트림 전송 종료" }
     }
 }
