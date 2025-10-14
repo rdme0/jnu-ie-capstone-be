@@ -37,10 +37,10 @@ class MenuController(
     ) = service.get(storeId = id, memberInfo = userDetails.memberInfo, pageable)
 
     @PutMapping
-    fun updateMenu(
+    suspend fun updateMenu(
         @PathVariable id: Long,
         @AuthenticationPrincipal userDetails: KioskUserDetails,
         @RequestBody request: UpdateMenuRequest
-    ) = service
+    ) = service.update(storeId = id, memberInfo = userDetails.memberInfo, request = request)
 
 }
