@@ -7,9 +7,11 @@ import jnu.ie.capstone.member.repository.MemberRepository
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Profile
 import org.springframework.context.event.EventListener
+import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 
 @Component
+@Order(1)
 @Profile("dev")
 class MemberDevInitializer(
     private val memberRepository: MemberRepository
