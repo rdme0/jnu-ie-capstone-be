@@ -40,12 +40,14 @@ class KioskAiSessionHandler(
         val userDetails = authentication?.principal as? KioskUserDetails
             ?: run {
                 logger.error { "올바르지 않은 authentication -> ${session.principal}" }
+                session.close(CloseStatus.POLICY_VIOLATION)
                 return
             }
 
         val storeId = session.attributes["storeId"] as? Long
             ?: run {
                 logger.error { "올바르지 않은 storeId -> ${session.attributes["storeId"]}" }
+                session.close(CloseStatus.BAD_DATA)
                 return
             }
 

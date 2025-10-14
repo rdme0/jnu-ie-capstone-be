@@ -1,12 +1,17 @@
 package jnu.ie.capstone.e2e.session
 
 import jnu.ie.capstone.Application
+import jnu.ie.capstone.common.security.util.JwtUtil
 import jnu.ie.capstone.gemini.config.GeminiConfig
+import jnu.ie.capstone.member.constant.MemberConstant.TEST_EMAIL
+import jnu.ie.capstone.member.dto.MemberInfo
+import jnu.ie.capstone.member.repository.MemberRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -36,7 +41,9 @@ class KioskAiSessionHandlerE2ETest(
     @param:LocalServerPort
     private var port: Int,
     private val resourceLoader: ResourceLoader,
-    private val geminiConfig: GeminiConfig
+    private val geminiConfig: GeminiConfig,
+    private val memberRepository: MemberRepository,
+    private val jwtUtil: JwtUtil
 ) {
 
     private companion object {
@@ -45,6 +52,15 @@ class KioskAiSessionHandlerE2ETest(
 
     private val client = StandardWebSocketClient()
     private val receivedMessages = ArrayBlockingQueue<ByteArray>(10)
+    private lateinit var accessToken: String
+
+    @BeforeEach
+    fun setUp() {
+        val member = memberRepository.findByEmail(TEST_EMAIL)
+            ?: throw IllegalStateException("test user not found")
+
+        accessToken = jwtUtil.generateToken(MemberInfo.from(member))
+    }
 
     @AfterEach
     fun tearDown() {
@@ -56,6 +72,7 @@ class KioskAiSessionHandlerE2ETest(
     fun e2e() {
         val latch = CompletableDeferred<Unit>()
         val headers = WebSocketHttpHeaders()
+        headers.add("Sec-WebSocket-Protocol", "Bearer $accessToken")
         val session = getSession(latch, headers)
 
         runBlocking {
