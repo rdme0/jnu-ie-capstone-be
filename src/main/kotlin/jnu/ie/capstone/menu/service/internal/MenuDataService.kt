@@ -29,6 +29,12 @@ class MenuDataService(
     }
 
     @Transactional(readOnly = true)
+    fun getRelevantBy(store: Store, ownerId: Long, embedding: FloatArray, limit: Int): List<Menu> {
+        return repository.findRelevantMenus(store.id, ownerId, embedding, limit)
+    }
+
+
+    @Transactional(readOnly = true)
     fun getBy(store: Store, ownerId: Long, id: Long): Menu? {
         return repository.findByStoreIdAndStoreOwnerIdAndId(store.id, ownerId, id)
     }
