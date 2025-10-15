@@ -17,6 +17,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.Array;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -30,16 +31,20 @@ public class Menu extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Setter
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
 
+    @Setter
     @AttributeOverride(name = "value", column = @Column(name = "price", nullable = false))
     private Price price;
 
+    @Setter
     @AttributeOverride(name = "value", column = @Column(name = "name", nullable = false))
     private MenuName name;
 
+    @Setter
     @Column(nullable = false)
     @Array(length = 768)
     @JdbcTypeCode(SqlTypes.VECTOR)
