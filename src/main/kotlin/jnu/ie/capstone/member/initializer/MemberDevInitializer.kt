@@ -4,7 +4,7 @@ import jnu.ie.capstone.common.security.util.JwtUtil
 import jnu.ie.capstone.member.constant.MemberConstant.TEST_EMAIL
 import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.member.model.entity.Member
-import jnu.ie.capstone.member.model.entity.Oauth2Provider
+import jnu.ie.capstone.member.model.vo.Oauth2Provider
 import jnu.ie.capstone.member.repository.MemberRepository
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Profile
