@@ -1,6 +1,8 @@
 spring:
   application.name: capstone
   profiles.default: dev
+  main:
+    web-application-type: servlet
   config:
     import:
       - classpath:config/application-security.yml
