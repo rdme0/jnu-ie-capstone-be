@@ -1,7 +1,5 @@
 package jnu.ie.capstone.menu.dto.internal
 
-import jnu.ie.capstone.menu.dto.response.MenuResponse
-import jnu.ie.capstone.menu.dto.response.OptionResponse
 import jnu.ie.capstone.menu.model.entity.Menu
 import jnu.ie.capstone.menu.model.entity.Option
 
@@ -9,7 +7,7 @@ data class MenuInternalDTO(
     val id: Long,
     val name: String,
     val price: Long,
-    val options: List<OptionResponse>? = null
+    val options: List<OptionInternalDTO>? = null
 ) {
     companion object {
         fun from(menu: Menu, options: List<Option>? = null): MenuInternalDTO {
@@ -17,18 +15,9 @@ data class MenuInternalDTO(
                 id = menu.id,
                 name = menu.name.value,
                 price = menu.price.value,
-                options = options?.map { OptionInternalDTO.from(it).toResponse() }
+                options = options?.map { OptionInternalDTO.from(it) }
             )
         }
-    }
-
-    fun toResponse(): MenuResponse {
-        return MenuResponse(
-            id = id,
-            name = name,
-            price = price,
-            options = options
-        )
     }
 
     override fun toString(): String {
