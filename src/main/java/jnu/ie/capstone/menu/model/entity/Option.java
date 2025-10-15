@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jnu.ie.capstone.common.model.entity.BaseEntity;
 import jnu.ie.capstone.menu.model.vo.OptionName;
 import jnu.ie.capstone.menu.model.vo.Price;
 import lombok.AccessLevel;
@@ -19,7 +20,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Option {
+public class Option extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
