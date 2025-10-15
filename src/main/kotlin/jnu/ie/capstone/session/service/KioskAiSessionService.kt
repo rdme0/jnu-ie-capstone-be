@@ -41,18 +41,18 @@ class KioskAiSessionService(
     ) {
         val sharedVoiceStream = voiceStream.shareIn(scopeForContext, SharingStarted.Lazily)
 
-        val voiceFastInput: Flow<GeminiInput.Audio> = sharedVoiceStream.map {
-            GeminiInput.Audio(it)
-        }
+        val voiceFastInput: Flow<GeminiInput.Audio> = sharedVoiceStream
+            .map { GeminiInput.Audio(it) }
 
-        val contextSlowInput: Flow<GeminiInput.Text> = sttService.stt(sharedVoiceStream, scopeForContext)
+        val contextSlowInput: Flow<GeminiInput.Text> = sttService
+            .stt(sharedVoiceStream, scopeForContext)
             .filter { it.final }
             .map { it.alternatives.first().text }
             .map { menuService.getRelevant(text = it, storeId, ownerInfo) }
             .map { GeminiInput.Text(Context.MenuContext(menus = it)) }
 
         val mergedInput = merge(voiceFastInput, contextSlowInput)
-            .onEach { logger.debug { "gemini input -> $it"} }
+            .onEach { logger.debug { "gemini input -> $it" } }
 
         liveClient.getLiveResponse(mergedInput, "")
             .collect { output ->
