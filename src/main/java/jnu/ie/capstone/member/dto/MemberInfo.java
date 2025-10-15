@@ -1,7 +1,7 @@
 package jnu.ie.capstone.member.dto;
 
 import jnu.ie.capstone.member.model.entity.Member;
-import jnu.ie.capstone.member.model.entity.Role;
+import jnu.ie.capstone.member.model.vo.Role;
 import jnu.ie.capstone.member.model.vo.Email;
 import lombok.Builder;
 

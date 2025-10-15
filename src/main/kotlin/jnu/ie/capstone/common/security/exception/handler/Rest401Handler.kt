@@ -29,7 +29,7 @@ class Rest401Handler : AuthenticationEntryPoint {
         response.characterEncoding = "UTF-8"
 
         logger.warn {
-            "인증 실패 -> ${authException.message}, URI - ${request.requestURI}," +
+            "인증 실패 -> ${authException.message}, URI - ${request.requestURI}, " +
                     "authorization header - ${request.getHeader(AUTHORIZATION_HEADER)?.take(10)}..."
         }
 

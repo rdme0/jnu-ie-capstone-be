@@ -3,12 +3,13 @@ package jnu.ie.capstone.menu.model.vo;
 import static jnu.ie.capstone.menu.constant.MenuConstant.MIN_PRICE;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.persistence.Embeddable;
 import jnu.ie.capstone.common.exception.client.BadDataSyntaxException;
 
 @Embeddable
 public record Price(
-        Long value
+        @JsonValue Long value
 ) {
 
     @JsonCreator

@@ -11,6 +11,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jnu.ie.capstone.common.model.entity.BaseEntity;
 import jnu.ie.capstone.member.model.vo.Email;
+import jnu.ie.capstone.member.model.vo.Oauth2Provider;
+import jnu.ie.capstone.member.model.vo.Role;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;

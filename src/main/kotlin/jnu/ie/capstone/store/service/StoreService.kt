@@ -11,7 +11,7 @@ class StoreService(
 ) {
 
     @Transactional
-    fun get(id: Long, ownerId: Long): Store? {
+    fun getBy(id: Long, ownerId: Long): Store? {
         return repository.findByIdAndOwnerId(id, ownerId)
     }
 

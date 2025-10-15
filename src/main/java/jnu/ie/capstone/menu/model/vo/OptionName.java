@@ -4,12 +4,13 @@ import static jnu.ie.capstone.menu.constant.MenuConstant.OPTION_NAME_MAX_LENGTH;
 import static jnu.ie.capstone.menu.constant.MenuConstant.OPTION_NAME_MIN_LENGTH;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.persistence.Embeddable;
 import jnu.ie.capstone.common.exception.client.BadDataLengthException;
 
 @Embeddable
 public record OptionName(
-        String value
+        @JsonValue String value
 ) {
 
     @JsonCreator

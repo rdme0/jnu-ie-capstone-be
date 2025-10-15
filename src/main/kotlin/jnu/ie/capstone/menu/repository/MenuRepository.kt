@@ -10,16 +10,16 @@ import org.springframework.stereotype.Repository
 @Repository
 interface MenuRepository : JpaRepository<Menu, Long> {
 
-    fun findByStoreIdAndStoreOwnerId(storeId: Long, ownerId: Long): List<Menu>
-    fun findByStoreIdAndStoreOwnerId(storeId: Long, ownerId: Long, pageable: Pageable): Page<Menu>
-    fun findByStoreIdAndStoreOwnerIdAndId(storeId: Long, ownerId: Long, id: Long): Menu?
+    fun findByStoreId(storeId: Long): List<Menu>
+    fun findByStoreId(storeId: Long, pageable: Pageable): Page<Menu>
+    fun findByStoreIdAndId(storeId: Long, id: Long): Menu?
     fun deleteByIdIn(ids: List<Long>)
 
     @Query(
         value = """
         SELECT m.* FROM menu m
         JOIN store s ON m.store_id = s.id
-        WHERE s.id = :storeId AND s.owner_id = :ownerId
+        WHERE s.id = :storeId
         ORDER BY m.embedding <-> CAST(:embedding AS vector)
         LIMIT :limit
     """,
@@ -27,7 +27,6 @@ interface MenuRepository : JpaRepository<Menu, Long> {
     )
     fun findRelevantMenus(
         storeId: Long,
-        ownerId: Long,
         embedding: FloatArray,
         limit: Int
     ): List<Menu>

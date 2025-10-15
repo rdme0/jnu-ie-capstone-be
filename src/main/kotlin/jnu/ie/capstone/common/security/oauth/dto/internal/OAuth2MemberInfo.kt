@@ -1,7 +1,7 @@
 package jnu.ie.capstone.common.security.oauth.dto.internal
 
 import jnu.ie.capstone.common.exception.server.InternalServerException
-import jnu.ie.capstone.member.model.entity.Oauth2Provider
+import jnu.ie.capstone.member.model.vo.Oauth2Provider
 import jnu.ie.capstone.member.model.vo.Email
 
 data class OAuth2MemberInfo(

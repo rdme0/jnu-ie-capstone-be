@@ -7,11 +7,18 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing
+import org.springframework.data.web.config.EnableSpringDataWebSupport
 
 @SpringBootApplication
 @EnableJpaAuditing
-@EnableConfigurationProperties(AllowedOriginsProperties::class, GeminiConfig::class, RtzrConfig::class)
+@EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
+@EnableConfigurationProperties(
+    AllowedOriginsProperties::class,
+    GeminiConfig::class,
+    RtzrConfig::class
+)
 class Application
-    fun main(args: Array<String>) {
-        runApplication<Application>(*args)
-    }
+
+fun main(args: Array<String>) {
+    runApplication<Application>(*args)
+}

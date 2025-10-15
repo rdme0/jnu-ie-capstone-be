@@ -2,6 +2,8 @@ package jnu.ie.capstone.menu.service.internal
 
 import jnu.ie.capstone.menu.model.entity.Option
 import jnu.ie.capstone.menu.repository.OptionRepository
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -11,8 +13,23 @@ class OptionDataService(
 ) {
 
     @Transactional
+    fun save(option: Option) {
+        repository.save(option)
+    }
+
+    @Transactional
     fun save(options: List<Option>) {
         repository.saveAll(options)
+    }
+
+    @Transactional(readOnly = true)
+    fun getBy(menuId: Long, id: Long) : Option? {
+        return repository.findByMenuIdAndId(menuId, id)
+    }
+
+    @Transactional(readOnly = true)
+    fun getAllBy(menuId: Long, pageable: Pageable) : Page<Option> {
+        return repository.findByMenuId(menuId, pageable)
     }
 
     @Transactional(readOnly = true)
@@ -21,14 +38,13 @@ class OptionDataService(
     }
 
     @Transactional
-    fun deleteOptionBy(menuIds: List<Long>) {
-        repository.deleteByMenuIdIn(menuIds)
+    fun deleteBy(id: Long) {
+        repository.deleteById(id)
     }
 
     @Transactional
-    fun overwrite(menuIdsOfOptions: List<Long>, options: List<Option>) {
-        deleteOptionBy(menuIdsOfOptions)
-        save(options)
+    fun deleteAllBy(menuId: Long) {
+        repository.deleteAllByMenuId(menuId)
     }
 
 }

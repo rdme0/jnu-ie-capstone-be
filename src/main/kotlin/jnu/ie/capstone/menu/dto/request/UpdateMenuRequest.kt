@@ -1,11 +1,9 @@
 package jnu.ie.capstone.menu.dto.request
 
-import jnu.ie.capstone.menu.dto.request.interfaces.MenuRequest
-import jnu.ie.capstone.menu.dto.request.internal.UpdateMenuRequestDTO
+import jnu.ie.capstone.menu.model.vo.MenuName
+import jnu.ie.capstone.menu.model.vo.Price
 
 data class UpdateMenuRequest(
-    override val menus: List<UpdateMenuRequestDTO>
-) : MenuRequest
-
-
-
+    val price: Price,
+    val name: MenuName,
+)

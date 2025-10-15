@@ -1,11 +1,11 @@
 spring:
   config.activate.on-profile: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/kiosk
+    url: jdbc:postgresql://localhost:15432/kiosk
     username: postgres
     password: 1
     driver-class-name: org.postgresql.Driver
   jpa:
     properties.hibernate.format_sql: true
     defer-datasource-initialization: true
-    hibernate.ddl-auto: create
+    hibernate.ddl-auto: update
