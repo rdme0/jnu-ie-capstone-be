@@ -17,7 +17,7 @@ class GeminiClient(
 ) {
     private val client = Client.builder().apiKey(config.apiKey).build()
 
-    suspend fun getEmbedding(
+    fun getEmbedding(
         text: String,
         model: GeminiModel = GeminiModel.GEMINI_EMBEDDING_001
     ): List<ContentEmbedding> {
@@ -26,8 +26,7 @@ class GeminiClient(
             .outputDimensionality(768)
             .build()
 
-        val responseFuture = client.async.models.embedContent(model.toString(), text, config)
-        val response = responseFuture.await()
+        val response = client.models.embedContent(model.toString(), text, config)
         val embeddings = response.embeddings()
 
         return embeddings.orElse(null)
