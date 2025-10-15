@@ -23,7 +23,7 @@ class MenuController(
 ) {
 
     @PostMapping
-    suspend fun createMenu(
+    fun createMenu(
         @PathVariable id: Long,
         @AuthenticationPrincipal userDetails: KioskUserDetails,
         @RequestBody request: CreateMenuRequest
@@ -37,7 +37,7 @@ class MenuController(
     ) = service.get(storeId = id, memberInfo = userDetails.memberInfo, pageable)
 
     @PutMapping
-    suspend fun updateMenu(
+    fun updateMenu(
         @PathVariable id: Long,
         @AuthenticationPrincipal userDetails: KioskUserDetails,
         @RequestBody request: UpdateMenuRequest

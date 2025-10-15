@@ -43,7 +43,7 @@ class MenuCoordinateService(
     }
 
     @Transactional
-    suspend fun save(storeId: Long, memberInfo: MemberInfo, request: CreateMenuRequest) {
+    fun save(storeId: Long, memberInfo: MemberInfo, request: CreateMenuRequest) {
         val store = storeService.get(storeId, memberInfo.id) ?: throw NoSuchStoreException()
 
         val menus: List<Pair<Menu, List<Option>?>> = assembleMenuWithOptions(
@@ -113,7 +113,7 @@ class MenuCoordinateService(
     }
 
     @Transactional
-    suspend fun update(storeId: Long, memberInfo: MemberInfo, request: UpdateMenuRequest) {
+    fun update(storeId: Long, memberInfo: MemberInfo, request: UpdateMenuRequest) {
         val store = storeService.get(storeId, memberInfo.id) ?: throw NoSuchStoreException()
         val menus: List<Pair<Menu, List<Option>?>> = assembleMenuWithOptions(
             request = request,
@@ -131,7 +131,7 @@ class MenuCoordinateService(
         optionDataService.overwrite(menuIdsOfOptions = ids, options)
     }
 
-    private suspend fun assembleMenuWithOptions(
+    private fun assembleMenuWithOptions(
         request: MenuRequest,
         store: Store,
         ownerInfo: MemberInfo
@@ -158,7 +158,7 @@ class MenuCoordinateService(
                     val menuEmbeddings = if (previousEntity.name.value != updateDTO.name.value) {
                         try {
                             embedVector(updateDTO.name.value, EMBEDDING_PLAN.planA)
-                        } catch (e: ServerException) {
+                        } catch (_: ServerException) {
                             embedVector(updateDTO.name.value, EMBEDDING_PLAN.planB)
                         }
                     } else {
@@ -205,7 +205,7 @@ class MenuCoordinateService(
         maxAttempts = 3,
         backoff = Backoff(delay = 1000, multiplier = 2.0)
     )
-    private suspend fun embedVector(text: String, model: GeminiModel): FloatArray =
+    private fun embedVector(text: String, model: GeminiModel): FloatArray =
         geminiClient.getEmbedding(text, model).first().values().get().toFloatArray()
 }
 
