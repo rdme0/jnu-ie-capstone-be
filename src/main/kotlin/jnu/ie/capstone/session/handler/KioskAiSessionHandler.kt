@@ -35,11 +35,11 @@ class KioskAiSessionHandler(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
-        val authentication = session.principal as? UsernamePasswordAuthenticationToken
+        val authentication = session.attributes["principal"] as? UsernamePasswordAuthenticationToken
 
         val userDetails = authentication?.principal as? KioskUserDetails
             ?: run {
-                logger.error { "올바르지 않은 authentication -> ${session.principal}" }
+                logger.error { "올바르지 않은 authentication -> ${session.attributes["principal"]}" }
                 session.close(CloseStatus.POLICY_VIOLATION)
                 return
             }
