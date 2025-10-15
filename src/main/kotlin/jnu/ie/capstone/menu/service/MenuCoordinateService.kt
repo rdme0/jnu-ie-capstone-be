@@ -1,18 +1,20 @@
 package jnu.ie.capstone.menu.service
 
 import com.google.genai.errors.ServerException
-import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.gemini.client.GeminiClient
 import jnu.ie.capstone.gemini.constant.enums.GeminiModel
 import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.menu.constant.MenuConstant
-import jnu.ie.capstone.menu.dto.internal.interfaces.MenuDTO
 import jnu.ie.capstone.menu.dto.internal.MenuInternalDTO
+import jnu.ie.capstone.menu.dto.internal.interfaces.MenuDTO
 import jnu.ie.capstone.menu.dto.request.CreateMenuRequest
+import jnu.ie.capstone.menu.dto.request.CreateOptionRequest
 import jnu.ie.capstone.menu.dto.request.UpdateMenuRequest
-import jnu.ie.capstone.menu.dto.request.interfaces.MenuRequest
+import jnu.ie.capstone.menu.dto.request.UpdateOptionRequest
 import jnu.ie.capstone.menu.dto.response.MenuResponse
+import jnu.ie.capstone.menu.dto.response.OptionResponse
 import jnu.ie.capstone.menu.exception.NoSuchMenuException
+import jnu.ie.capstone.menu.exception.NoSuchOptionException
 import jnu.ie.capstone.menu.model.entity.Menu
 import jnu.ie.capstone.menu.model.entity.Option
 import jnu.ie.capstone.menu.service.internal.MenuDataService
@@ -43,13 +45,12 @@ class MenuCoordinateService(
     }
 
     @Transactional
-    fun save(storeId: Long, memberInfo: MemberInfo, request: CreateMenuRequest) {
-        val store = storeService.get(storeId, memberInfo.id) ?: throw NoSuchStoreException()
+    fun createMenu(storeId: Long, ownerInfo: MemberInfo, request: CreateMenuRequest) {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
 
         val menus: List<Pair<Menu, List<Option>?>> = assembleMenuWithOptions(
             request = request,
-            store = store,
-            ownerInfo = memberInfo
+            store = store
         )
 
         menuDataService.save(menus.map { it.first })
@@ -63,29 +64,113 @@ class MenuCoordinateService(
         optionDataService.save(options)
     }
 
-    @Transactional(readOnly = true)
-    fun get(storeId: Long, memberInfo: MemberInfo, pageable: Pageable): Page<MenuResponse> {
-        val store = storeService.get(storeId, memberInfo.id) ?: throw NoSuchStoreException()
+    @Transactional
+    fun createOption(
+        storeId: Long,
+        menuId: Long,
+        ownerInfo: MemberInfo,
+        request: CreateOptionRequest
+    ) {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
 
-        val menus: Page<Menu> = menuDataService.getPageBy(store, memberInfo.id, pageable)
+        val menu = menuDataService.getBy(store.id, menuId) ?: throw NoSuchMenuException()
 
-        val menuIds = menus.content.map { it.id }
+        val newOption = Option.builder()
+            .menu(menu)
+            .name(request.option.name)
+            .price(request.option.price)
+            .build()
 
-        val optionsByMenuId: Map<Long, List<Option>> = optionDataService.getAllBy(menuIds)
-            .groupBy { it.menu.id }
-
-        return menus.map {
-            MenuInternalDTO.from(it, optionsByMenuId[it.id] ?: emptyList()).toResponse()
-        }
+        optionDataService.save(newOption)
     }
 
     @Transactional(readOnly = true)
-    suspend fun getRelevant(
+    fun getMenuResponses(
+        storeId: Long,
+        ownerInfo: MemberInfo,
+        pageable: Pageable
+    ): Page<MenuResponse> {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+
+        val menus: Page<Menu> = menuDataService.getPageBy(store.id, pageable)
+
+        return menus.map { MenuResponse.from(it) }
+    }
+
+    @Transactional(readOnly = true)
+    fun getOptionResponses(
+        storeId: Long,
+        menuId: Long,
+        ownerInfo: MemberInfo,
+        pageable: Pageable
+    ): Page<OptionResponse> {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        val menu = menuDataService.getBy(store.id, menuId) ?: throw NoSuchMenuException()
+
+        return optionDataService
+            .getAllBy(menu.id, pageable)
+            .map { OptionResponse.from(it) }
+    }
+
+    @Transactional
+    fun updateMenu(storeId: Long, menuId: Long, ownerInfo: MemberInfo, request: UpdateMenuRequest) {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+
+        val oldMenu = menuDataService.getBy(storeId = store.id, id = menuId)
+            ?: throw NoSuchMenuException()
+
+        updateMenuEntity(oldMenu, request)
+    }
+
+    @Transactional
+    fun updateOption(
+        storeId: Long,
+        menuId: Long,
+        optionId: Long,
+        ownerInfo: MemberInfo,
+        request: UpdateOptionRequest
+    ) {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        val menu = menuDataService.getBy(store.id, menuId) ?: throw NoSuchMenuException()
+        val option = optionDataService.getBy(menu.id, optionId) ?: throw NoSuchOptionException()
+
+        option.name = request.option.name
+        option.price = request.option.price
+    }
+
+    @Transactional
+    fun deleteOption(
+        storeId: Long,
+        menuId: Long,
+        optionId: Long,
+        ownerInfo: MemberInfo,
+    ) {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        menuDataService.getBy(store.id, menuId) ?: throw NoSuchMenuException()
+
+        optionDataService.deleteBy(optionId)
+    }
+
+    @Transactional
+    fun deleteMenu(
+        storeId: Long,
+        menuId: Long,
+        ownerInfo: MemberInfo,
+    ) {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        val menu = menuDataService.getBy(store.id, menuId) ?: throw NoSuchMenuException()
+
+        optionDataService.deleteAllBy(menuId = menu.id)
+        menuDataService.deleteBy(menu.id)
+    }
+
+    @Transactional(readOnly = true)
+    fun getRelevant(
         text: String,
         storeId: Long,
         ownerInfo: MemberInfo,
     ): List<MenuInternalDTO> {
-        val store = storeService.get(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
 
         val embedding = try {
             embedVector(text, EMBEDDING_PLAN.planA)
@@ -94,15 +179,14 @@ class MenuCoordinateService(
         }
 
         val relevantMenus = menuDataService.getRelevantBy(
-            store = store,
-            ownerId = ownerInfo.id,
+            storeId = store.id,
             embedding = embedding,
             limit = MenuConstant.RELEVANT_MENU_SIZE
         )
 
-        val optionsByRelevantMenuId: Map<Long, List<Option>> =
-            optionDataService.getAllBy(relevantMenus.map { it.id })
-                .groupBy { it.menu.id }
+        val optionsByRelevantMenuId: Map<Long, List<Option>> = optionDataService
+            .getAllBy(relevantMenus.map { it.id })
+            .groupBy { it.menu.id }
 
         return relevantMenus.map {
             MenuInternalDTO.from(
@@ -112,68 +196,36 @@ class MenuCoordinateService(
         }
     }
 
-    @Transactional
-    fun update(storeId: Long, memberInfo: MemberInfo, request: UpdateMenuRequest) {
-        val store = storeService.get(storeId, memberInfo.id) ?: throw NoSuchStoreException()
-        val menus: List<Pair<Menu, List<Option>?>> = assembleMenuWithOptions(
-            request = request,
-            store = store,
-            ownerInfo = memberInfo
-        )
-
-        val ids = menuDataService.getListBy(store, memberInfo.id).map { it.id }
-
-        menuDataService.overwrite(ids, menus.map { it.first })
-
-        val options = menus.map { it.second ?: emptyList() }.flatten().ifEmpty { return }
-
-        //todo: overwrite dirty checking 방식으로 변경
-        optionDataService.overwrite(menuIdsOfOptions = ids, options)
+    private fun assembleMenuWithOptions(
+        request: CreateMenuRequest,
+        store: Store
+    ): List<Pair<Menu, List<Option>?>> {
+        return request.menus.map { createDTO ->
+            val menuEmbeddings = try {
+                embedVector(createDTO.name.value, EMBEDDING_PLAN.planA)
+            } catch (_: ServerException) {
+                embedVector(createDTO.name.value, EMBEDDING_PLAN.planB)
+            }
+            buildMenuAndOptions(store, createDTO, menuEmbeddings)
+        }
     }
 
-    private fun assembleMenuWithOptions(
-        request: MenuRequest,
-        store: Store,
-        ownerInfo: MemberInfo
-    ): List<Pair<Menu, List<Option>?>> {
-        return when (request) {
-
-            is CreateMenuRequest -> {
-                request.menus.map { createDTO ->
-                    val menuEmbeddings = try {
-                        embedVector(createDTO.name.value, EMBEDDING_PLAN.planA)
-                    } catch (_: ServerException) {
-                        embedVector(createDTO.name.value, EMBEDDING_PLAN.planB)
-                    }
-
-                    buildMenuAndOptions(store, createDTO, menuEmbeddings)
-                }
+    private fun updateMenuEntity(
+        oldMenu: Menu,
+        request: UpdateMenuRequest
+    ): Menu {
+        if (oldMenu.name.value != request.name.value) {
+            oldMenu.embedding = try {
+                embedVector(request.name.value, EMBEDDING_PLAN.planA)
+            } catch (_: ServerException) {
+                embedVector(request.name.value, EMBEDDING_PLAN.planB)
             }
-
-            is UpdateMenuRequest -> {
-                request.menus.map { updateDTO ->
-                    val previousEntity = menuDataService.getBy(store, ownerInfo.id, updateDTO.id)
-                        ?: throw NoSuchMenuException()
-
-                    val menuEmbeddings = if (previousEntity.name.value != updateDTO.name.value) {
-                        try {
-                            embedVector(updateDTO.name.value, EMBEDDING_PLAN.planA)
-                        } catch (_: ServerException) {
-                            embedVector(updateDTO.name.value, EMBEDDING_PLAN.planB)
-                        }
-                    } else {
-                        previousEntity.embedding
-                    }
-
-                    buildMenuAndOptions(store, updateDTO, menuEmbeddings)
-                }
-            }
-
-            else -> {
-                throw InternalServerException(cause = IllegalStateException("알 수 없는 타입 -> ${request::class.simpleName}"))
-            }
-
         }
+
+        oldMenu.name = request.name
+        oldMenu.price = request.price
+
+        return oldMenu
     }
 
     private fun buildMenuAndOptions(
@@ -205,8 +257,9 @@ class MenuCoordinateService(
         maxAttempts = 3,
         backoff = Backoff(delay = 1000, multiplier = 2.0)
     )
-    private fun embedVector(text: String, model: GeminiModel): FloatArray =
-        geminiClient.getEmbedding(text, model).first().values().get().toFloatArray()
+    private fun embedVector(text: String, model: GeminiModel): FloatArray {
+        return geminiClient.getEmbedding(text, model).first().values().get().toFloatArray()
+    }
 }
 
 private data class EmbeddingPlan(
