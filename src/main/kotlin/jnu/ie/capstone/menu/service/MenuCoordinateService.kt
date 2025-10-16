@@ -19,22 +19,21 @@ import jnu.ie.capstone.menu.model.entity.Menu
 import jnu.ie.capstone.menu.model.entity.Option
 import jnu.ie.capstone.menu.service.internal.MenuDataService
 import jnu.ie.capstone.menu.service.internal.OptionDataService
+import jnu.ie.capstone.menu.util.MenuUtil
 import jnu.ie.capstone.store.exception.NoSuchStoreException
 import jnu.ie.capstone.store.model.entity.Store
 import jnu.ie.capstone.store.service.StoreService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
-import org.springframework.retry.annotation.Backoff
-import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class MenuCoordinateService(
-    private val geminiClient: GeminiClient,
     private val menuDataService: MenuDataService,
     private val optionDataService: OptionDataService,
     private val storeService: StoreService,
+    private val util: MenuUtil
 ) {
 
     private companion object {
@@ -173,9 +172,9 @@ class MenuCoordinateService(
         val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
 
         val embedding = try {
-            embedVector(text, EMBEDDING_PLAN.planA)
+            util.embedVector(text, EMBEDDING_PLAN.planA)
         } catch (_: ServerException) {
-            embedVector(text, EMBEDDING_PLAN.planB)
+            util.embedVector(text, EMBEDDING_PLAN.planB)
         }
 
         val relevantMenus = menuDataService.getRelevantBy(
@@ -202,9 +201,9 @@ class MenuCoordinateService(
     ): List<Pair<Menu, List<Option>?>> {
         return request.menus.map { createDTO ->
             val menuEmbeddings = try {
-                embedVector(createDTO.name.value, EMBEDDING_PLAN.planA)
+                util.embedVector(createDTO.name.value, EMBEDDING_PLAN.planA)
             } catch (_: ServerException) {
-                embedVector(createDTO.name.value, EMBEDDING_PLAN.planB)
+                util.embedVector(createDTO.name.value, EMBEDDING_PLAN.planB)
             }
             buildMenuAndOptions(store, createDTO, menuEmbeddings)
         }
@@ -216,9 +215,9 @@ class MenuCoordinateService(
     ): Menu {
         if (oldMenu.name.value != request.name.value) {
             oldMenu.embedding = try {
-                embedVector(request.name.value, EMBEDDING_PLAN.planA)
+                util.embedVector(request.name.value, EMBEDDING_PLAN.planA)
             } catch (_: ServerException) {
-                embedVector(request.name.value, EMBEDDING_PLAN.planB)
+                util.embedVector(request.name.value, EMBEDDING_PLAN.planB)
             }
         }
 
@@ -249,16 +248,6 @@ class MenuCoordinateService(
         }
 
         return menuEntity to optionEntities
-    }
-
-    //todo: jitter 추가
-    @Retryable(
-        value = [ServerException::class],
-        maxAttempts = 3,
-        backoff = Backoff(delay = 1000, multiplier = 2.0)
-    )
-    private fun embedVector(text: String, model: GeminiModel): FloatArray {
-        return geminiClient.getEmbedding(text, model).first().values().get().toFloatArray()
     }
 }
 
