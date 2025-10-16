@@ -1,12 +1,15 @@
 package jnu.ie.capstone.session.service
 
 import jnu.ie.capstone.gemini.client.GeminiLiveClient
+import jnu.ie.capstone.gemini.config.PromptConfig
 import jnu.ie.capstone.gemini.dto.client.internal.Context
 import jnu.ie.capstone.gemini.dto.client.request.GeminiInput
 import jnu.ie.capstone.gemini.dto.client.response.GeminiOutput.*
 import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.menu.service.MenuCoordinateService
 import jnu.ie.capstone.rtzr.service.RtzrSttService
+import jnu.ie.capstone.session.enums.SessionEvent
+import jnu.ie.capstone.session.enums.SessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,14 +21,15 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import mu.KotlinLogging
+import org.springframework.statemachine.StateMachine
 import org.springframework.stereotype.Service
-import org.springframework.web.socket.WebSocketSession
 
 @Service
 class KioskAiSessionService(
     private val liveClient: GeminiLiveClient,
     private val menuService: MenuCoordinateService,
-    private val sttService: RtzrSttService
+    private val sttService: RtzrSttService,
+    private val promptConfig: PromptConfig
 ) {
     companion object {
         private val logger = KotlinLogging.logger {}
@@ -37,7 +41,7 @@ class KioskAiSessionService(
         voiceStream: Flow<ByteArray>,
         storeId: Long,
         ownerInfo: MemberInfo,
-        session: WebSocketSession
+        stateMachine: StateMachine<SessionState, SessionEvent>
     ) {
         val sharedVoiceStream = voiceStream.shareIn(scopeForContext, SharingStarted.Lazily)
 
@@ -50,31 +54,36 @@ class KioskAiSessionService(
             .map { it.alternatives.first().text }
             .map { menuService.getRelevant(text = it, storeId, ownerInfo) }
             .map { GeminiInput.Text(Context.MenuContext(menus = it)) }
+            .onEach { logger.info { "gemini slow input -> $it" } }
 
         val mergedInput = merge(voiceFastInput, contextSlowInput)
-            .onEach { logger.debug { "gemini input -> $it" } }
+            .onEach { logger.debug { "gemini merged input -> $it" } }
 
-        liveClient.getLiveResponse(mergedInput, "")
+        liveClient.getLiveResponse(mergedInput, promptConfig.kiosk)
             .collect { output ->
-                logger.debug { "output -> $output" }
                 when (output) {
                     is InputSTT -> {
-
+                        logger.info { "gemini input stt -> ${output.text}" }
                     }
 
                     is OutputSTT -> {
+                        logger.info { "gemini output stt -> ${output.text}" }
+                    }
+
+                    is FunctionCall -> {
+                        logger.info { "now state -> ${stateMachine.id}" }
+                        logger.info { "gemini output function -> ${output.name}" }
+                        logger.info { "gemini output params -> ${output.params}" }
+
 
                     }
 
-                    is OutputFunction -> {
-
-                    }
-
-                    is OutputVoiceStream -> {
+                    is VoiceStream -> {
 
                     }
 
                     is EndOfGeminiTurn -> {
+
                     }
                 }
             }
