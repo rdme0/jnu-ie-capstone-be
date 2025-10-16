@@ -5,7 +5,7 @@ import jnu.ie.capstone.menu.dto.internal.MenuInternalDTO
 sealed interface Context {
     data class MenuContext(val menus: List<MenuInternalDTO>) : Context {
         override fun toString(): String {
-            return menus.joinToString("\n\n\n") { menu -> menu.toString() }
+            return menus.joinToString("\n" + "_".repeat(20) + "\n") { menu -> menu.toString() }
         }
     }
 }
