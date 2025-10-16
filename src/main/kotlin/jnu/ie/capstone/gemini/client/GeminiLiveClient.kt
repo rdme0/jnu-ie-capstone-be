@@ -65,17 +65,22 @@ class GeminiLiveClient(
         return LiveConnectConfig.builder()
             .tools(GeminiFunctionDeclaration.STATEMACHINE_TOOL)
             .responseModalities(Modality.Known.AUDIO)
-            .speechConfig(SpeechConfig.builder().languageCode("ko-KR").build())
             .inputAudioTranscription(AudioTranscriptionConfig.builder().build())
             .outputAudioTranscription(AudioTranscriptionConfig.builder().build())
             .realtimeInputConfig(buildRealTimeInputConfig())
             .systemInstruction(Content.fromParts(Part.fromText(prompt)))
             .speechConfig(
-                SpeechConfig.builder().voiceConfig(
-                    VoiceConfig.builder().prebuiltVoiceConfig(
-                        PrebuiltVoiceConfig.builder().voiceName(GeminiVoice.ZEPHYR.text).build()
+                SpeechConfig.builder()
+                    .languageCode("ko-KR")
+                    .voiceConfig(
+                        VoiceConfig.builder()
+                            .prebuiltVoiceConfig(
+                                PrebuiltVoiceConfig.builder()
+                                    .voiceName(
+                                        GeminiVoice.ZEPHYR.text
+                                    ).build()
+                            ).build()
                     )
-                )
             )
             .build()
     }
