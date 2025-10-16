@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Profile
 import org.springframework.context.event.EventListener
 import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 @Component
 @Order(1)
@@ -24,6 +25,7 @@ class MemberDevInitializer(
         val logger = mu.KotlinLogging.logger {}
     }
 
+    @Transactional
     @EventListener(ApplicationReadyEvent::class)
     fun init() {
         val member = memberRepository.findByEmail(TEST_EMAIL)
