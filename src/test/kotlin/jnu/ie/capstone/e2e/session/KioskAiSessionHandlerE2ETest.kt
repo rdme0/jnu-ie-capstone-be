@@ -78,7 +78,7 @@ class KioskAiSessionHandlerE2ETest(
         runBlocking {
             latch.await()
 
-            val resource = resourceLoader.getResource("classpath:test/e2e-test.wav")
+            val resource = resourceLoader.getResource("classpath:test/아아.wav")
             val inputStream = resource.inputStream
             val totalBytes = inputStream.available()
             val halfwayPoint = totalBytes / 2
