@@ -14,7 +14,6 @@ import jnu.ie.capstone.menu.util.MenuUtil
 import jnu.ie.capstone.store.repository.StoreRepository
 import kotlinx.coroutines.delay
 import mu.KotlinLogging
-import okhttp3.internal.immutableListOf
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Profile
 import org.springframework.context.event.EventListener
@@ -22,6 +21,7 @@ import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import kotlin.jvm.optionals.getOrNull
+import kotlin.random.Random
 
 @Component
 @Order(3)
@@ -35,9 +35,9 @@ class MenuDevInitializer(
 
     private companion object {
         val logger = KotlinLogging.logger {}
-        val MENUS = immutableListOf("아이스 아메리카노", "아이스 카페라떼", "아이스 카푸치노", "아이스 카페모카", "아이스티")
+        val MENUS = listOf("아이스 아메리카노", "아이스 카페라떼", "아이스 카푸치노", "아이스 카페모카", "아이스티")
         val MENU_COUNT = MENUS.size
-        val OPTIONS = immutableListOf("샷 추가", "시럽 추가", "디카페인", "설탕 추가", "아이스크림 추가")
+        val OPTIONS = listOf("샷 추가", "시럽 추가", "디카페인", "설탕 추가", "아이스크림 추가")
         val OPTION_COUNT = OPTIONS.size
     }
 
@@ -67,7 +67,7 @@ class MenuDevInitializer(
                     .name(MenuName(name))
                     .embedding(embeddings)
                     .store(store)
-                    .price(Price((Math.random() * 20000).toLong()))
+                    .price(Price(Random.nextLong(20000)))
                     .build()
             }
 
@@ -82,7 +82,7 @@ class MenuDevInitializer(
                     Option.builder()
                         .name(OptionName("${OPTIONS[index % OPTIONS.size]} $index"))
                         .menu(menu)
-                        .price(Price((Math.random() * 3000).toLong()))
+                        .price(Price(Random.nextLong(3000)))
                         .build()
                 }
             }.flatten()
