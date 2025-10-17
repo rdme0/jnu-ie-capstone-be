@@ -7,7 +7,7 @@ sealed class GeminiOutput {
     data class OutputSTT(val text: String) : GeminiOutput()
 
     data class FunctionCall(
-        val name: GeminiFunctionSignature,
+        val signature: GeminiFunctionSignature,
         val params: GeminiFunctionParams
     ) : GeminiOutput()
 
