@@ -50,6 +50,8 @@ class KioskSessionService(
     ) {
         val sharedVoiceStream = voiceStream.shareIn(scopeForContext, SharingStarted.Lazily)
 
+        val shoppingCart = session.attributes["shoppingCart"] as ShoppingCartDTO
+
         val voiceFastInput: Flow<GeminiInput.Audio> = sharedVoiceStream
             .map { GeminiInput.Audio(it) }
 
@@ -58,48 +60,49 @@ class KioskSessionService(
             .filter { it.final }
             .map { it.alternatives.first().text }
             .map { menuService.getMenuRelevant(text = it, storeId, ownerInfo) }
-            .map { GeminiInput.Text(Context.MenuContext(menus = it)) }
+            .map {
+                GeminiInput.Text(
+                    Context.MenuAndShoppingCart(menus = it, shoppingCart = shoppingCart)
+                )
+            }
             .onEach { logger.info { "gemini slow input -> $it" } }
 
         val mergedInput = merge(voiceFastInput, contextSlowInput)
             .onEach { logger.debug { "gemini merged input -> $it" } }
 
-        liveClient.getLiveResponse(mergedInput, promptConfig.kiosk)
-            .collect { output ->
-                when (output) {
-                    is InputSTT -> {
-                        logger.info { "gemini input stt -> ${output.text}" }
-                    }
+        liveClient.getLiveResponse(mergedInput, promptConfig.kiosk).collect { output ->
+            when (output) {
+                is InputSTT -> {
+                    logger.info { "gemini input stt -> ${output.text}" }
+                }
 
-                    is OutputSTT -> {
-                        logger.info { "gemini output stt -> ${output.text}" }
-                    }
+                is OutputSTT -> {
+                    logger.info { "gemini output stt -> ${output.text}" }
+                }
 
-                    is FunctionCall -> {
-                        logger.info { "now state -> ${stateMachine.id}" }
-                        logger.info { "gemini output function -> ${output.signature}" }
-                        logger.info { "gemini output params -> ${output.params}" }
+                is FunctionCall -> {
+                    logger.info { "now state -> ${stateMachine.id}" }
+                    logger.info { "gemini output function -> ${output.signature}" }
+                    logger.info { "gemini output params -> ${output.params}" }
 
-                        output.signature.toSessionEvent()
-                            ?.let { handleSessionEvent(it, stateMachine) }
-                            ?: run {
-                                val shoppingCart =
-                                    session.attributes["shoppingCart"] as ShoppingCartDTO
+                    output.signature.toSessionEvent()
+                        ?.let { handleSessionEvent(it, stateMachine) }
+                        ?: run {
 
-                                handleFunctionCall(output, storeId, ownerInfo, shoppingCart)
-                            }
+                            handleFunctionCall(output, storeId, ownerInfo, shoppingCart)
+                        }
 
-                    }
+                }
 
-                    is VoiceStream -> {
+                is VoiceStream -> {
 
-                    }
+                }
 
-                    is EndOfGeminiTurn -> {
+                is EndOfGeminiTurn -> {
 
-                    }
                 }
             }
+        }
     }
 
     private fun handleSessionEvent(
