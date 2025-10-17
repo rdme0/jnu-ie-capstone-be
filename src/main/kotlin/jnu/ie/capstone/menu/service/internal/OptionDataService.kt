@@ -23,8 +23,18 @@ class OptionDataService(
     }
 
     @Transactional(readOnly = true)
+    fun getBy(id: Long) : Option? {
+        return repository.findById(id).orElse(null)
+    }
+
+    @Transactional(readOnly = true)
     fun getBy(menuId: Long, id: Long) : Option? {
         return repository.findByMenuIdAndId(menuId, id)
+    }
+
+    @Transactional(readOnly = true)
+    fun getAllBy(menuId: Long) : List<Option> {
+        return repository.findByMenuId(menuId)
     }
 
     @Transactional(readOnly = true)
