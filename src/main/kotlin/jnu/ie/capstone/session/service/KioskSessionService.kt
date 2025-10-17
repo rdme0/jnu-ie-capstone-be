@@ -82,7 +82,12 @@ class KioskSessionService(
 
                         output.signature.toSessionEvent()
                             ?.let { handleSessionEvent(it, stateMachine) }
-                            ?: run { handleFunctionCall(output, storeId, ownerInfo, session) }
+                            ?: run {
+                                val shoppingCart =
+                                    session.attributes["shoppingCart"] as ShoppingCartDTO
+
+                                handleFunctionCall(output, storeId, ownerInfo, shoppingCart)
+                            }
 
                     }
 
@@ -109,8 +114,9 @@ class KioskSessionService(
         output: FunctionCall,
         storeId: Long,
         ownerInfo: MemberInfo,
-        session: WebSocketSession
+        shoppingCart: ShoppingCartDTO
     ) {
+        logger.info { "쇼핑카트 before -> $shoppingCart" }
         when (output.signature) {
             ADD_MENUS_OR_OPTIONS -> {
                 val params = output.params as AddItems
@@ -118,7 +124,7 @@ class KioskSessionService(
                 shoppingCartService.addMenu(
                     storeId = storeId,
                     ownerInfo = ownerInfo,
-                    shoppingCart = session.attributes["shoppingCart"] as ShoppingCartDTO,
+                    shoppingCart = shoppingCart,
                     addItems = params
                 )
             }
@@ -127,7 +133,7 @@ class KioskSessionService(
                 val params = output.params as RemoveItems
 
                 shoppingCartService.removeMenu(
-                    shoppingCart = session.attributes["shoppingCart"] as ShoppingCartDTO,
+                    shoppingCart = shoppingCart,
                     removeItems = params
                 )
             }
@@ -136,6 +142,8 @@ class KioskSessionService(
 
             else -> {}
         }
+
+        logger.info { "쇼핑카트 after -> $shoppingCart" }
     }
 
 }
