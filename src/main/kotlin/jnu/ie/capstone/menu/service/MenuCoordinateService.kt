@@ -1,7 +1,6 @@
 package jnu.ie.capstone.menu.service
 
 import com.google.genai.errors.ServerException
-import jnu.ie.capstone.gemini.client.GeminiClient
 import jnu.ie.capstone.gemini.constant.enums.GeminiModel
 import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.menu.constant.MenuConstant
@@ -164,7 +163,35 @@ class MenuCoordinateService(
     }
 
     @Transactional(readOnly = true)
-    fun getRelevant(
+    fun getMenuInternal(
+        storeId: Long,
+        ownerInfo: MemberInfo,
+        menuId: Long
+    ): MenuInternalDTO {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        val menu =  menuDataService.getBy(store.id, menuId) ?: throw NoSuchMenuException()
+        val optionsByOneMenu = optionDataService.getAllBy(menu.id)
+
+        return MenuInternalDTO.from(menu, optionsByOneMenu)
+    }
+
+    @Transactional(readOnly = true)
+    fun getMenuInternalByOptionId(
+        storeId: Long,
+        ownerInfo: MemberInfo,
+        optionId: Long
+    ): MenuInternalDTO {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        val option = optionDataService.getBy(optionId) ?: throw NoSuchOptionException()
+        val menu = option.menu
+
+        if (menu.store.id != store.id) throw NoSuchMenuException()
+
+        return MenuInternalDTO.from(menu, listOf(option))
+    }
+
+    @Transactional(readOnly = true)
+    fun getMenuRelevant(
         text: String,
         storeId: Long,
         ownerInfo: MemberInfo,
