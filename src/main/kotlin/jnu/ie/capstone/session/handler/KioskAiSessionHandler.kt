@@ -28,7 +28,8 @@ class KioskAiSessionHandler(
     private val stateMachineFactory: StateMachineFactory<SessionState, SessionEvent>
 ) : BinaryWebSocketHandler() {
 
-    private val sessionStateMachines = ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
+    private val sessionStateMachines =
+        ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
         logger.info { "연결 성공 -> ${session.id}" }
@@ -38,7 +39,6 @@ class KioskAiSessionHandler(
         logger.info { "${session.id} statemachine 생성 완료. 현재 상태 -> ${stateMachine.state.id}" }
 
         val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
 
         val clientVoiceStream = MutableSharedFlow<ByteArray>(
             extraBufferCapacity = 128,
