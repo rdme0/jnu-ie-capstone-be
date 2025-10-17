@@ -1,9 +1,10 @@
 package jnu.ie.capstone.session.handler
 
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
+import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
-import jnu.ie.capstone.session.service.KioskAiSessionService
+import jnu.ie.capstone.session.service.KioskSessionService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,20 +24,17 @@ private val logger = KotlinLogging.logger {}
 
 @Component
 class KioskAiSessionHandler(
-    private val kioskAiSessionService: KioskAiSessionService,
+    private val kioskSessionService: KioskSessionService,
     private val stateMachineFactory: StateMachineFactory<SessionState, SessionEvent>
 ) : BinaryWebSocketHandler() {
 
-    private val sessions = ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
+    private val sessionStateMachines = ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
         logger.info { "연결 성공 -> ${session.id}" }
 
-        val stateMachine = stateMachineFactory.getStateMachine(session.id)
+        val stateMachine = initializeStateMachine(session)
 
-        stateMachine.startReactively().subscribe()
-
-        sessions[session.id] = stateMachine
         logger.info { "${session.id} statemachine 생성 완료. 현재 상태 -> ${stateMachine.state.id}" }
 
         val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -63,13 +61,18 @@ class KioskAiSessionHandler(
                 return
             }
 
+        session.attributes["shoppingCart"] = ShoppingCartDTO(mutableListOf())
+
+        logger.info { "쇼핑카트 생성 완료" }
+
         sessionScope.launch {
             try {
-                kioskAiSessionService.processVoiceChunk(
+                kioskSessionService.processVoiceChunk(
                     clientVoiceStream,
                     storeId,
                     userDetails.memberInfo,
-                    stateMachine
+                    stateMachine,
+                    session
                 )
             } catch (_: CancellationException) {
                 logger.info { "세션 ${session.id} 처리가 정상적으로 취소되었습니다." }
@@ -98,6 +101,15 @@ class KioskAiSessionHandler(
         logger.info { "Client disconnected: ${session.id}" }
 
         (session.attributes["sessionScope"] as? CoroutineScope)?.cancel()
+    }
+
+    private fun initializeStateMachine(session: WebSocketSession): StateMachine<SessionState, SessionEvent> {
+        val stateMachine = stateMachineFactory.getStateMachine(session.id)
+
+        stateMachine.startReactively().subscribe()
+
+        sessionStateMachines[session.id] = stateMachine
+        return stateMachine
     }
 
 }
