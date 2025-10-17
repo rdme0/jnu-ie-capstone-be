@@ -1,15 +1,18 @@
 package jnu.ie.capstone.session.enums
 
-enum class SessionEvent(val text: String) {
-    CONFIRM_CART("CONFIRM_CART"),
-    CONFIRM_PAYMENT("CONFIRM_PAYMENT"),
-    PROCESS_PAYMENT("PROCESS_PAYMENT"),
-    PREVIOUS("PREVIOUS"),
-    CANCEL("CANCEL");
+
+enum class SessionEvent {
+    CONFIRM_CART,
+    CONFIRM_PAYMENT,
+    PROCESS_PAYMENT,
+    PREVIOUS,
+    CANCEL;
+
+    val text: String
+        get() = this.name
 
     companion object {
-        fun fromText(text: String?): SessionEvent? {
-            text ?: return null
+        fun fromText(text: String): SessionEvent? {
             return entries.find { it.text == text }
         }
     }

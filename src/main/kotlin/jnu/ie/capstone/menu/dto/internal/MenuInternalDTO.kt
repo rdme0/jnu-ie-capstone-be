@@ -27,12 +27,6 @@ data class MenuInternalDTO(
             ?.joinToString("\n\n") { it.toString() }
             ?: "없음"
 
-        return """
-            메뉴 id : $id
-            메뉴 이름 : $name
-            가격 : ${price}원
-            선택 가능한 옵션 : [
-                $optionsString
-            ]""".trimIndent()
+        return "메뉴 id : $id\n메뉴 이름 : $name\n가격 : $price 원\n선택 가능한 옵션 : [\n$optionsString\n]"
     }
 }

@@ -1,6 +1,5 @@
 package jnu.ie.capstone.menu.dto.internal
 
-import jnu.ie.capstone.menu.dto.response.OptionResponse
 import jnu.ie.capstone.menu.model.entity.Option
 
 data class OptionInternalDTO(
@@ -18,19 +17,7 @@ data class OptionInternalDTO(
         }
     }
 
-    fun toResponse(): OptionResponse {
-        return OptionResponse(
-            id = id,
-            price = price,
-            name = name
-        )
-    }
-
     override fun toString(): String {
-        return """
-            옵션 id : $id
-            옵션 이름 : $name
-            옵션 가격 : $price
-        """.trimIndent()
+        return "옵션 id : $id\n옵션 이름 : $name\n옵션 가격 : $price 원"
     }
 }

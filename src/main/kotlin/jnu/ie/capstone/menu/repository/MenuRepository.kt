@@ -20,7 +20,7 @@ interface MenuRepository : JpaRepository<Menu, Long> {
         SELECT m.* FROM menu m
         JOIN store s ON m.store_id = s.id
         WHERE s.id = :storeId
-        ORDER BY m.embedding <-> CAST(:embedding AS vector)
+        ORDER BY m.embedding <-> CAST(:embedding AS vector) ASC
         LIMIT :limit
     """,
         nativeQuery = true

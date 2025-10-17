@@ -1,7 +1,6 @@
 package jnu.ie.capstone.menu.service
 
 import com.google.genai.errors.ServerException
-import jnu.ie.capstone.gemini.client.GeminiClient
 import jnu.ie.capstone.gemini.constant.enums.GeminiModel
 import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.menu.constant.MenuConstant
@@ -19,22 +18,21 @@ import jnu.ie.capstone.menu.model.entity.Menu
 import jnu.ie.capstone.menu.model.entity.Option
 import jnu.ie.capstone.menu.service.internal.MenuDataService
 import jnu.ie.capstone.menu.service.internal.OptionDataService
+import jnu.ie.capstone.menu.util.MenuUtil
 import jnu.ie.capstone.store.exception.NoSuchStoreException
 import jnu.ie.capstone.store.model.entity.Store
 import jnu.ie.capstone.store.service.StoreService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
-import org.springframework.retry.annotation.Backoff
-import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class MenuCoordinateService(
-    private val geminiClient: GeminiClient,
     private val menuDataService: MenuDataService,
     private val optionDataService: OptionDataService,
     private val storeService: StoreService,
+    private val util: MenuUtil
 ) {
 
     private companion object {
@@ -165,7 +163,35 @@ class MenuCoordinateService(
     }
 
     @Transactional(readOnly = true)
-    fun getRelevant(
+    fun getMenuInternal(
+        storeId: Long,
+        ownerInfo: MemberInfo,
+        menuId: Long
+    ): MenuInternalDTO {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        val menu =  menuDataService.getBy(store.id, menuId) ?: throw NoSuchMenuException()
+        val optionsByOneMenu = optionDataService.getAllBy(menu.id)
+
+        return MenuInternalDTO.from(menu, optionsByOneMenu)
+    }
+
+    @Transactional(readOnly = true)
+    fun getMenuInternalByOptionId(
+        storeId: Long,
+        ownerInfo: MemberInfo,
+        optionId: Long
+    ): MenuInternalDTO {
+        val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
+        val option = optionDataService.getBy(optionId) ?: throw NoSuchOptionException()
+        val menu = option.menu
+
+        if (menu.store.id != store.id) throw NoSuchMenuException()
+
+        return MenuInternalDTO.from(menu, listOf(option))
+    }
+
+    @Transactional(readOnly = true)
+    fun getMenuRelevant(
         text: String,
         storeId: Long,
         ownerInfo: MemberInfo,
@@ -173,9 +199,9 @@ class MenuCoordinateService(
         val store = storeService.getBy(storeId, ownerInfo.id) ?: throw NoSuchStoreException()
 
         val embedding = try {
-            embedVector(text, EMBEDDING_PLAN.planA)
+            util.embedVector(text, EMBEDDING_PLAN.planA)
         } catch (_: ServerException) {
-            embedVector(text, EMBEDDING_PLAN.planB)
+            util.embedVector(text, EMBEDDING_PLAN.planB)
         }
 
         val relevantMenus = menuDataService.getRelevantBy(
@@ -202,9 +228,9 @@ class MenuCoordinateService(
     ): List<Pair<Menu, List<Option>?>> {
         return request.menus.map { createDTO ->
             val menuEmbeddings = try {
-                embedVector(createDTO.name.value, EMBEDDING_PLAN.planA)
+                util.embedVector(createDTO.name.value, EMBEDDING_PLAN.planA)
             } catch (_: ServerException) {
-                embedVector(createDTO.name.value, EMBEDDING_PLAN.planB)
+                util.embedVector(createDTO.name.value, EMBEDDING_PLAN.planB)
             }
             buildMenuAndOptions(store, createDTO, menuEmbeddings)
         }
@@ -216,9 +242,9 @@ class MenuCoordinateService(
     ): Menu {
         if (oldMenu.name.value != request.name.value) {
             oldMenu.embedding = try {
-                embedVector(request.name.value, EMBEDDING_PLAN.planA)
+                util.embedVector(request.name.value, EMBEDDING_PLAN.planA)
             } catch (_: ServerException) {
-                embedVector(request.name.value, EMBEDDING_PLAN.planB)
+                util.embedVector(request.name.value, EMBEDDING_PLAN.planB)
             }
         }
 
@@ -249,16 +275,6 @@ class MenuCoordinateService(
         }
 
         return menuEntity to optionEntities
-    }
-
-    //todo: jitter 추가
-    @Retryable(
-        value = [ServerException::class],
-        maxAttempts = 3,
-        backoff = Backoff(delay = 1000, multiplier = 2.0)
-    )
-    private fun embedVector(text: String, model: GeminiModel): FloatArray {
-        return geminiClient.getEmbedding(text, model).first().values().get().toFloatArray()
     }
 }
 

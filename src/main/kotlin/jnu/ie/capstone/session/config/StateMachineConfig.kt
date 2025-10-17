@@ -3,13 +3,13 @@ package jnu.ie.capstone.session.config
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
 import org.springframework.context.annotation.Configuration
-import org.springframework.statemachine.config.EnableStateMachine
+import org.springframework.statemachine.config.EnableStateMachineFactory
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer
 
 @Configuration
-@EnableStateMachine
+@EnableStateMachineFactory
 class StateMachineConfig : EnumStateMachineConfigurerAdapter<SessionState, SessionEvent>() {
 
     override fun configure(states: StateMachineStateConfigurer<SessionState, SessionEvent>) {
