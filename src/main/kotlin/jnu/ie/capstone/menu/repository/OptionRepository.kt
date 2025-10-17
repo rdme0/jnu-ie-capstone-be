@@ -11,6 +11,8 @@ interface OptionRepository : JpaRepository<Option, Long> {
 
     fun findByMenuIdAndId(menuId: Long, id: Long): Option?
 
+    fun findByMenuId(menuId: Long): List<Option>
+
     fun findByMenuId(menuId: Long, pageable: Pageable): Page<Option>
 
     fun findByMenuIdIn(menuId: List<Long>): List<Option>
