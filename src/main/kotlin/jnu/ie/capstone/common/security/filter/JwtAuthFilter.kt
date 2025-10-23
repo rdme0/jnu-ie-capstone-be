@@ -32,7 +32,7 @@ class JwtAuthFilter(
             "/favicon.ico",
             "/oauth2/authorization/**",
             "/login/**",
-            "/websocket/voice"
+            "/stores/*/websocket/kioskSession/**"
         )
         private val pathMatcher: AntPathMatcher = AntPathMatcher()
     }

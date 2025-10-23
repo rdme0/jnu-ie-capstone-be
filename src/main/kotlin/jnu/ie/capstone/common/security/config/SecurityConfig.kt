@@ -62,7 +62,7 @@ class SecurityConfig(
                     "/auth/success",
                     "/error",
                     "/favicon.ico",
-                    "/websocket/voice"
+                    "/stores/*/websocket/kioskSession/**"
                 )
                     .permitAll()
                     .anyRequest().authenticated()
