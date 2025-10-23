@@ -1,17 +1,14 @@
 package jnu.ie.capstone.common.websocket.interceptor
 
-import mu.KotlinLogging
 import org.springframework.http.server.ServerHttpRequest
 import org.springframework.http.server.ServerHttpResponse
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.WebSocketHandler
 import org.springframework.web.socket.server.HandshakeInterceptor
-import org.springframework.web.util.UriComponentsBuilder
 import java.lang.Exception
 
 @Component
-class QueryParmsInterceptor() : HandshakeInterceptor {
-    private val logger = KotlinLogging.logger {}
+class StoreIdHandshakeInterceptor : HandshakeInterceptor {
 
     override fun beforeHandshake(
         request: ServerHttpRequest,
@@ -19,16 +16,16 @@ class QueryParmsInterceptor() : HandshakeInterceptor {
         wsHandler: WebSocketHandler,
         attributes: MutableMap<String, Any>
     ): Boolean {
-        val requestUri = UriComponentsBuilder.fromUri(request.uri)
-            .build()
+        val uriTemplateVars = request.uri.path.split("/")
+        val storeIdIndex = uriTemplateVars.indexOf("stores") + 1
 
-        attributes["storeId"] = requestUri
-            .queryParams
-            .getFirst("storeId")?.toLongOrNull() ?: return false
+        if (storeIdIndex > 0 && storeIdIndex < uriTemplateVars.size) {
+            val storeId = uriTemplateVars[storeIdIndex].toLongOrNull() ?: return false
+            attributes["storeId"] = storeId
+            return true
+        }
 
-        logger.info { "storeId: ${attributes["storeId"]}" }
-
-        return true
+        return false
     }
 
     override fun afterHandshake(

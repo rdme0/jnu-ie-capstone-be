@@ -2,7 +2,7 @@ package jnu.ie.capstone.common.websocket.config
 
 import jnu.ie.capstone.common.security.config.AllowedOriginsProperties
 import jnu.ie.capstone.common.websocket.interceptor.JwtAuthHandshakeInterceptor
-import jnu.ie.capstone.common.websocket.interceptor.QueryParmsInterceptor
+import jnu.ie.capstone.common.websocket.interceptor.StoreIdHandshakeInterceptor
 import jnu.ie.capstone.session.handler.KioskAiSessionHandler
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.socket.config.annotation.EnableWebSocket
@@ -14,13 +14,13 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 class WebSocketConfig(
     private val originsProperties: AllowedOriginsProperties,
     private val authInterceptor: JwtAuthHandshakeInterceptor,
-    private val queryParmsInterceptor: QueryParmsInterceptor,
+    private val storeIdHandshakeInterceptor: StoreIdHandshakeInterceptor,
     private val handler: KioskAiSessionHandler
 ) : WebSocketConfigurer {
 
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
-        registry.addHandler(handler, "/websocket/voice")
-            .addInterceptors(queryParmsInterceptor, authInterceptor)
+        registry.addHandler(handler, "/stores/{storeId}/websocket/kioskSession")
+            .addInterceptors(authInterceptor, storeIdHandshakeInterceptor)
             .setAllowedOriginPatterns(*originsProperties.allowedFrontEndOrigins.toTypedArray())
     }
 
