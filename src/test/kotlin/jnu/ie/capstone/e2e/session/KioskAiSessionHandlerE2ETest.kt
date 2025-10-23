@@ -1,7 +1,9 @@
 package jnu.ie.capstone.e2e.session
 
+import jakarta.websocket.ContainerProvider
 import jnu.ie.capstone.Application
 import jnu.ie.capstone.common.security.util.JwtUtil
+import jnu.ie.capstone.common.websocket.constant.WebSocketConstant.BUFFER_SIZE
 import jnu.ie.capstone.gemini.config.GeminiConfig
 import jnu.ie.capstone.member.constant.MemberConstant.TEST_EMAIL
 import jnu.ie.capstone.member.dto.MemberInfo
@@ -21,8 +23,11 @@ import org.springframework.core.io.ResourceLoader
 import org.springframework.test.context.TestConstructor
 import org.springframework.test.context.junit.jupiter.SpringExtension
 import org.springframework.web.socket.BinaryMessage
+import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketHttpHeaders
 import org.springframework.web.socket.WebSocketSession
+import org.springframework.web.socket.client.WebSocketClient
 import org.springframework.web.socket.client.standard.StandardWebSocketClient
 import org.springframework.web.socket.handler.BinaryWebSocketHandler
 import java.net.URI
@@ -50,7 +55,14 @@ class KioskAiSessionHandlerE2ETest(
         const val STORE_ID = 1
     }
 
-    private val client = StandardWebSocketClient()
+    private val client: WebSocketClient by lazy {
+        val webSocketContainer = ContainerProvider.getWebSocketContainer()
+        webSocketContainer.defaultMaxBinaryMessageBufferSize = BUFFER_SIZE
+        webSocketContainer.defaultMaxTextMessageBufferSize = BUFFER_SIZE
+
+        StandardWebSocketClient(webSocketContainer)
+    }
+
     private val receivedMessages = ArrayBlockingQueue<ByteArray>(10)
     private lateinit var accessToken: String
 
@@ -84,8 +96,13 @@ class KioskAiSessionHandlerE2ETest(
             val halfwayPoint = totalBytes / 2
             val buffer = ByteArray(3200)
 
+            val silenceMs = geminiConfig.silenceDurationMs.toLong() + 1000L
+            val silentChunk = ByteArray(buffer.size)
+            val silenceIterations = silenceMs / 100
+
+            sendSilence(silenceIterations, session, silentChunk, silenceMs)
+
             var bytesSent = 0
-            // 1. 파일의 절반까지만 전송
             while (bytesSent < halfwayPoint) {
                 val bytesRead = inputStream.read(buffer)
                 if (bytesRead <= 0) break
@@ -96,10 +113,6 @@ class KioskAiSessionHandlerE2ETest(
                 delay(100)
             }
 
-            // 2. 중간 침묵
-            val silenceMs = geminiConfig.silenceDurationMs.toLong() + 1000L
-            val silentChunk = ByteArray(buffer.size)
-            val silenceIterations = silenceMs / 100
 
             logger.info { "음성 스트리밍 중간 지점 도달" }
 //            sendSilence(silenceIterations, session, silentChunk, silenceMs)
@@ -120,7 +133,7 @@ class KioskAiSessionHandlerE2ETest(
             sendSilence(silenceIterations, session, silentChunk, silenceMs)
 
             // 5. 마무리
-            logger.info { "음성 스트리밍 끝!" }
+            logger.info { "음성 스트리밍 끝! delay를 시작합니다." }
             delay(10000)
             session.close()
         }
@@ -132,6 +145,7 @@ class KioskAiSessionHandlerE2ETest(
         headers: WebSocketHttpHeaders
     ): WebSocketSession = client.execute(object : BinaryWebSocketHandler() {
         override fun afterConnectionEstablished(session: WebSocketSession) {
+            logger.info { "테스트 클라이언트 연결 성공: ${session.id}" }
             latch.complete(Unit)
         }
 
@@ -139,11 +153,31 @@ class KioskAiSessionHandlerE2ETest(
             session: WebSocketSession,
             message: BinaryMessage
         ) {
-            val bytes = ByteArray(message.payload.remaining())
-            message.payload.get(bytes)
-            receivedMessages.offer(bytes)
+            try {
+                val bytes = ByteArray(message.payload.remaining())
+                message.payload.get(bytes)
+                receivedMessages.offer(bytes)
+            } catch (e: Exception) {
+                logger.error(e) { "테스트 클라이언트 바이너리 메시지 처리 중 에러" }
+            }
         }
-    }, headers, URI("ws://localhost:${port}/websocket/voice?storeId=${STORE_ID}"))
+
+        override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
+            try {
+                logger.info { "테스트 클라이언트 수신 (Text): ${message.payload}" }
+            } catch (e: Exception) {
+                logger.error(e) { "테스트 클라이언트 텍스트 메시지 처리 중 에러" }
+            }
+        }
+
+        override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
+            logger.warn { "테스트 클라이언트 연결 종료: ${session.id}, status: $status" }
+        }
+
+        override fun handleTransportError(session: WebSocketSession, exception: Throwable) {
+            logger.error(exception) { "테스트 클라이언트 전송 에러: ${session.id}" }
+        }
+    }, headers, URI("ws://localhost:${port}/stores/${STORE_ID}/websocket/kioskSession"))
         .get(3, TimeUnit.SECONDS)
 
     private suspend fun sendSilence(
