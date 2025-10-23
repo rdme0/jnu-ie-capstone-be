@@ -224,7 +224,7 @@ class GeminiLiveClient(
 
     private fun buildAudioContent(voiceChunk: ByteArray): LiveSendRealtimeInputParameters {
         return LiveSendRealtimeInputParameters.builder()
-            .audio(Blob.builder().mimeType("audio/pcm").data(voiceChunk))
+            .audio(Blob.builder().mimeType("audio/pcm;rate=16000").data(voiceChunk))
             .build()
     }
 
