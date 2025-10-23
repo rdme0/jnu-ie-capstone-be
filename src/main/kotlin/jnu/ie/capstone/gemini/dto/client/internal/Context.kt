@@ -12,9 +12,11 @@ sealed interface Context {
             val menusText =  menus
                 .joinToString("\n" + "_".repeat(20) + "\n") { it.toString() }
 
+            val divider = "\n" + "=".repeat(20) + "\n"
+
             val shoppingCartText = "장바구니 : [\n${shoppingCart}\n]"
 
-            return "$menusText\n\n$shoppingCartText"
+            return menusText + divider + shoppingCartText
         }
     }
 }
