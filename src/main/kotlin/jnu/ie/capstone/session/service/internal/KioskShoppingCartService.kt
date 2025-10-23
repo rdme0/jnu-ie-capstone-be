@@ -24,19 +24,36 @@ class KioskShoppingCartService(
         ownerInfo: MemberInfo,
         shoppingCart: ShoppingCartDTO,
         addItems: AddItems
-    ) {
+    ): Boolean {
+        var added = false
+
         addItems.orderItems.forEach { request ->
             val menuId = request.menuId
             val optionIds = request.optionIds
 
             when {
                 menuId != null -> {
-                    addMenuToShoppingCart(storeId, ownerInfo, menuId, optionIds, shoppingCart)
+                    val addedSuccessfully = addMenuToShoppingCart(
+                        storeId,
+                        ownerInfo,
+                        menuId,
+                        optionIds,
+                        shoppingCart
+                    )
+
+                    if (addedSuccessfully) added = true
                 }
 
                 not(optionIds.isNullOrEmpty()) -> {
                     optionIds?.forEach { optionId ->
-                        addOnlyOptionToShoppingCart(storeId, ownerInfo, optionId, shoppingCart)
+                        val addedSuccessfully = addOnlyOptionToShoppingCart(
+                            storeId,
+                            ownerInfo,
+                            optionId,
+                            shoppingCart
+                        )
+
+                        if (addedSuccessfully) added = true
                     }
                 }
 
@@ -45,41 +62,50 @@ class KioskShoppingCartService(
                 }
             }
         }
+
+        return added
     }
 
     fun removeMenu(
         shoppingCart: ShoppingCartDTO,
         removeItems: RemoveItems
-    ) {
+    ): Boolean {
+        var removed = false
+
         val menuIdsToRemove = removeItems.removeMenuIds
         val optionIdsToRemove = removeItems.removeOptionIds
 
         if (menuIdsToRemove.isNullOrEmpty() && optionIdsToRemove.isNullOrEmpty()) {
             logger.warn { "잘못된 AI 응답 -> menuIds와 optionIds가 모두 없음" }
-            return
+            return false
         }
 
         if (!menuIdsToRemove.isNullOrEmpty()) {
             val initialSize = shoppingCart.menus.size
-            shoppingCart.menus.removeIf { menu -> menuIdsToRemove.contains(menu.id) }
+            val removedSuccessfully = shoppingCart
+                .menus.removeIf { menu -> menuIdsToRemove.contains(menu.id) }
+
+            if (removedSuccessfully) removed = true
 
             if (initialSize == shoppingCart.menus.size)
                 logger.warn { "잘못된 AI 응답 -> 제거할 메뉴(ID:${menuIdsToRemove})를 찾지 못함" }
         }
 
+        var optionsRemoved = false
         if (!optionIdsToRemove.isNullOrEmpty()) {
-            var itemsRemoved = false
 
             shoppingCart.menus.forEach { menu ->
-                val initialOptionsSize = menu.options.size
-                menu.options.removeIf { option -> optionIdsToRemove.contains(option.id) }
-
-                if (initialOptionsSize > menu.options.size) itemsRemoved = true
+                optionsRemoved = optionsRemoved
+                        || menu.options.removeIf { option -> optionIdsToRemove.contains(option.id) }
             }
 
-            if (not(itemsRemoved))
+            if (not(optionsRemoved))
                 logger.warn { "잘못된 AI 응답 -> 제거할 옵션(ID:${optionIdsToRemove})을 찾지 못함" }
         }
+
+        removed = removed || optionsRemoved
+
+        return removed
     }
 
     private fun addMenuToShoppingCart(
@@ -88,12 +114,12 @@ class KioskShoppingCartService(
         requestMenuId: Long,
         requestOptionIds: List<Long>?,
         shoppingCart: ShoppingCartDTO
-    ) {
+    ): Boolean {
         val menuFromDb = runCatching {
             menuService.getMenuInternal(storeId, ownerInfo, menuId = requestMenuId)
         }.getOrNull() ?: run {
             logger.warn { "잘못된 ai 응답 -> id가 ${requestMenuId}인 메뉴를 찾지 못함" }
-            return
+            return false
         }
 
         val newOptions = menuFromDb.options
@@ -109,6 +135,8 @@ class KioskShoppingCartService(
         )
 
         shoppingCart.menus.add(newMenu)
+
+        return true
     }
 
     private fun addOnlyOptionToShoppingCart(
@@ -116,29 +144,31 @@ class KioskShoppingCartService(
         ownerInfo: MemberInfo,
         requestOptionId: Long,
         shoppingCart: ShoppingCartDTO
-    ) {
+    ): Boolean {
         val menuFromDb = runCatching {
             menuService.getMenuInternalByOptionId(storeId, ownerInfo, requestOptionId)
         }.getOrNull()
             ?: run {
                 logger.warn { "잘못된 ai 응답 -> 옵션 id가 ${requestOptionId}인 메뉴를 찾지 못함" }
-                return
+                return false
             }
 
         val targetMenuInCart = shoppingCart.menus.find { it.id == menuFromDb.id }
             ?: run {
                 logger.warn { "잘못된 ai 응답 -> 옵션(ID:${requestOptionId})의 부모 메뉴가 장바구니에 없어 요청을 무시함" }
-                return
+                return false
             }
 
         val newOption = menuFromDb.options?.first()
             ?: run {
                 logger.warn { "잘못된 ai 응답 -> 옵션(ID:${requestOptionId})을 db에서 찾지 못함" }
-                return
+                return false
             }
 
         val newOptionInCart = ShoppingCartOptionDTO(newOption.id, newOption.name, newOption.price)
 
         targetMenuInCart.options.add(newOptionInCart)
+
+        return true
     }
 }

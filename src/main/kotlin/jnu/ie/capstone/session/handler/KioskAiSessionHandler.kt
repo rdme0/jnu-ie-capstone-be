@@ -4,6 +4,7 @@ import jnu.ie.capstone.common.security.dto.KioskUserDetails
 import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
+import jnu.ie.capstone.session.registry.WebSocketSessionRegistry
 import jnu.ie.capstone.session.service.KioskSessionService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
@@ -20,25 +21,29 @@ import org.springframework.web.socket.handler.BinaryWebSocketHandler
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.cancellation.CancellationException
 
-private val logger = KotlinLogging.logger {}
-
 @Component
 class KioskAiSessionHandler(
     private val kioskSessionService: KioskSessionService,
-    private val stateMachineFactory: StateMachineFactory<SessionState, SessionEvent>
+    private val stateMachineFactory: StateMachineFactory<SessionState, SessionEvent>,
+    private val sessionRegistry: WebSocketSessionRegistry
 ) : BinaryWebSocketHandler() {
+    companion object {
+        private val logger = KotlinLogging.logger {}
+    }
 
-    private val sessionStateMachines = ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
+    private val sessionStateMachines =
+        ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
         logger.info { "연결 성공 -> ${session.id}" }
+
+        sessionRegistry.register(session)
 
         val stateMachine = initializeStateMachine(session)
 
         logger.info { "${session.id} statemachine 생성 완료. 현재 상태 -> ${stateMachine.state.id}" }
 
         val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
 
         val clientVoiceStream = MutableSharedFlow<ByteArray>(
             extraBufferCapacity = 128,
@@ -72,7 +77,12 @@ class KioskAiSessionHandler(
                     storeId,
                     userDetails.memberInfo,
                     stateMachine,
-                    session
+                    session,
+                    onVoiceChunk = { chunk ->
+                        if (session.isOpen) {
+                            session.sendMessage(BinaryMessage(chunk))
+                        }
+                    }
                 )
             } catch (_: CancellationException) {
                 logger.info { "세션 ${session.id} 처리가 정상적으로 취소되었습니다." }
@@ -92,15 +102,21 @@ class KioskAiSessionHandler(
         val bytes = ByteArray(message.payload.remaining())
         message.payload.get(bytes)
 
-        (session.attributes["sessionScope"] as? CoroutineScope)?.launch {
-            clientVoiceStream?.emit(bytes)
-        }
+        val emitted = clientVoiceStream?.tryEmit(bytes)
+
+        if (emitted == false)
+            logger.warn { "세션 ${session.id}의 음성 스트림 버퍼가 가득 찼습니다." }
+
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
-        logger.info { "Client disconnected: ${session.id}" }
+        logger.info { "Client disconnected: ${session.id}, code: ${status.code}, reason: ${status.reason}" }
 
         (session.attributes["sessionScope"] as? CoroutineScope)?.cancel()
+
+        sessionStateMachines.remove(session.id)
+
+        sessionRegistry.unregister(session.id)
     }
 
     private fun initializeStateMachine(session: WebSocketSession): StateMachine<SessionState, SessionEvent> {
