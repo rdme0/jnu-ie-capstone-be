@@ -11,20 +11,25 @@ import jnu.ie.capstone.gemini.dto.client.response.GeminiOutput.*
 import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.menu.service.MenuCoordinateService
 import jnu.ie.capstone.rtzr.service.RtzrSttService
+import jnu.ie.capstone.session.dto.internal.OutputTextChunkDTO
+import jnu.ie.capstone.session.dto.internal.OutputTextResultDTO
 import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
+import jnu.ie.capstone.session.event.EndOfGeminiTurnEvent
+import jnu.ie.capstone.session.event.OutputTextEvent
+import jnu.ie.capstone.session.event.ShoppingCartUpdatedEvent
 import jnu.ie.capstone.session.service.internal.KioskShoppingCartService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
 import mu.KotlinLogging
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.messaging.support.MessageBuilder
 import org.springframework.statemachine.StateMachine
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.WebSocketSession
-import reactor.core.Disposable
 import reactor.core.publisher.Mono
 
 @Service
@@ -33,7 +38,8 @@ class KioskSessionService(
     private val menuService: MenuCoordinateService,
     private val sttService: RtzrSttService,
     private val promptConfig: PromptConfig,
-    private val shoppingCartService: KioskShoppingCartService
+    private val shoppingCartService: KioskShoppingCartService,
+    private val eventPublisher: ApplicationEventPublisher
 ) {
     companion object {
         private val logger = KotlinLogging.logger {}
@@ -46,9 +52,10 @@ class KioskSessionService(
         storeId: Long,
         ownerInfo: MemberInfo,
         stateMachine: StateMachine<SessionState, SessionEvent>,
-        session: WebSocketSession
+        session: WebSocketSession,
+        onVoiceChunk: suspend (ByteArray) -> Unit
     ) {
-        val sharedVoiceStream = voiceStream.shareIn(scopeForContext, SharingStarted.Lazily)
+        val sharedVoiceStream = voiceStream.shareIn(scopeForContext, SharingStarted.Eagerly)
 
         val shoppingCart = session.attributes["shoppingCart"] as ShoppingCartDTO
 
@@ -78,6 +85,9 @@ class KioskSessionService(
 
                 is OutputSTT -> {
                     logger.info { "gemini output stt -> ${output.text}" }
+
+                    val content = OutputTextChunkDTO(output.text)
+                    eventPublisher.publishEvent(OutputTextEvent(this, session.id, content))
                 }
 
                 is FunctionCall -> {
@@ -88,18 +98,17 @@ class KioskSessionService(
                     output.signature.toSessionEvent()
                         ?.let { handleSessionEvent(it, stateMachine) }
                         ?: run {
-
-                            handleFunctionCall(output, storeId, ownerInfo, shoppingCart)
+                            handleFunctionCall(output, storeId, ownerInfo, shoppingCart, session.id)
                         }
-
                 }
 
                 is VoiceStream -> {
-
+                    onVoiceChunk(output.chunk)
                 }
 
                 is EndOfGeminiTurn -> {
-
+                    val content = OutputTextResultDTO(output.finalOutputSTT)
+                    eventPublisher.publishEvent(EndOfGeminiTurnEvent(this, session.id, content))
                 }
             }
         }
@@ -108,23 +117,28 @@ class KioskSessionService(
     private fun handleSessionEvent(
         event: SessionEvent,
         stateMachine: StateMachine<SessionState, SessionEvent>
-    ): Disposable {
+    ) {
+        logger.info { "now state -> ${stateMachine.id}" }
         val message = MessageBuilder.withPayload(event).build()
-        return stateMachine.sendEvent(Mono.just(message)).subscribe()
+        stateMachine.sendEvent(Mono.just(message)).subscribe()
+        logger.info { "after state -> ${stateMachine.id}" }
     }
 
     private fun handleFunctionCall(
         output: FunctionCall,
         storeId: Long,
         ownerInfo: MemberInfo,
-        shoppingCart: ShoppingCartDTO
+        shoppingCart: ShoppingCartDTO,
+        sessionId: String
     ) {
         logger.info { "쇼핑카트 before -> $shoppingCart" }
+        var isCartUpdated = false
+
         when (output.signature) {
             ADD_MENUS_OR_OPTIONS -> {
                 val params = output.params as AddItems
 
-                shoppingCartService.addMenu(
+                isCartUpdated = shoppingCartService.addMenu(
                     storeId = storeId,
                     ownerInfo = ownerInfo,
                     shoppingCart = shoppingCart,
@@ -135,7 +149,7 @@ class KioskSessionService(
             REMOVE_MENUS_OR_OPTIONS -> {
                 val params = output.params as RemoveItems
 
-                shoppingCartService.removeMenu(
+                isCartUpdated = shoppingCartService.removeMenu(
                     shoppingCart = shoppingCart,
                     removeItems = params
                 )
@@ -144,6 +158,11 @@ class KioskSessionService(
             DO_NOTHING -> {}
 
             else -> {}
+        }
+
+        if (isCartUpdated) {
+            val event = ShoppingCartUpdatedEvent(this, sessionId, content = shoppingCart)
+            eventPublisher.publishEvent(event)
         }
 
         logger.info { "쇼핑카트 after -> $shoppingCart" }
