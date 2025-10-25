@@ -161,7 +161,11 @@ class KioskSessionService(
         }
 
         if (isCartUpdated) {
-            val event = ShoppingCartUpdatedEvent(this, sessionId, content = shoppingCart)
+            val event = ShoppingCartUpdatedEvent(
+                source = this,
+                sessionId = sessionId,
+                content = shoppingCart.toResponseDTO()
+            )
             eventPublisher.publishEvent(event)
         }
 
