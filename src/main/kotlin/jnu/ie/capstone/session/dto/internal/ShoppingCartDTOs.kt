@@ -6,15 +6,25 @@ import java.time.ZonedDateTime
 
 data class ShoppingCartDTO(
     val menus: MutableList<ShoppingCartMenuDTO>
-) : SessionResponseContent {
+) {
 
     override fun toString(): String {
-        val menuString = if (menus.isEmpty()) "비었음"
+        return if (menus.isEmpty()) "비었음"
         else menus.joinToString("\n" + "_".repeat(20) + "\n") { it.toString() }
-
-        return menuString
     }
+
+    fun toResponseDTO(): ShoppingCartResponseDTO {
+        return ShoppingCartResponseDTO(menus = menus, menuCount = menus.size, totalPrice = getSum())
+    }
+
+    private fun getSum(): Long = menus.sumOf { it.getPrice() }
 }
+
+data class ShoppingCartResponseDTO(
+    val menus: List<ShoppingCartMenuDTO>,
+    val menuCount: Int,
+    val totalPrice: Long
+) : SessionResponseContent
 
 data class ShoppingCartMenuDTO(
     val id: Long,
@@ -32,6 +42,8 @@ data class ShoppingCartMenuDTO(
             )
         }\n선택한 옵션 : [\n$optionsString\n]"
     }
+
+    internal fun getPrice(): Long = price + options.sumOf { it.price }
 }
 
 data class ShoppingCartOptionDTO(
