@@ -2,11 +2,13 @@ package jnu.ie.capstone.menu.controller
 
 import jnu.ie.capstone.common.annotation.ResolvePageable
 import jnu.ie.capstone.common.constant.enums.SortField
+import jnu.ie.capstone.common.dto.response.CommonResponse
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
 import jnu.ie.capstone.menu.dto.request.CreateMenuRequest
 import jnu.ie.capstone.menu.dto.request.CreateOptionRequest
 import jnu.ie.capstone.menu.dto.request.UpdateMenuRequest
 import jnu.ie.capstone.menu.dto.request.UpdateOptionRequest
+import jnu.ie.capstone.menu.dto.response.MenuResponse
 import jnu.ie.capstone.menu.dto.response.OptionResponse
 import jnu.ie.capstone.menu.service.MenuCoordinateService
 import org.springframework.data.domain.Page
@@ -34,9 +36,12 @@ class MenuController(
         @PathVariable storeId: Long,
         @AuthenticationPrincipal userDetails: KioskUserDetails,
         @RequestBody request: CreateMenuRequest
-    ): ResponseEntity<Unit> {
+    ): ResponseEntity<CommonResponse> {
         service.createMenu(storeId = storeId, ownerInfo = userDetails.memberInfo, request = request)
-        return ResponseEntity.created(URI.create("/stores/$storeId/menus")).build()
+
+        return ResponseEntity
+            .created(URI.create("/stores/$storeId/menus"))
+            .body(CommonResponse.ofSuccess())
     }
 
     @PostMapping("{menuId}/options")
@@ -45,7 +50,7 @@ class MenuController(
         @PathVariable menuId: Long,
         @AuthenticationPrincipal userDetails: KioskUserDetails,
         @RequestBody request: CreateOptionRequest
-    ): ResponseEntity<Unit> {
+    ): ResponseEntity<CommonResponse> {
 
         service.createOption(
             storeId = storeId,
@@ -54,7 +59,9 @@ class MenuController(
             request = request
         )
 
-        return ResponseEntity.created(URI.create("/stores/$storeId/menus/$menuId/options")).build()
+        return ResponseEntity
+            .created(URI.create("/stores/$storeId/menus/$menuId/options"))
+            .body(CommonResponse.ofSuccess())
     }
 
     @GetMapping
@@ -62,7 +69,13 @@ class MenuController(
         @PathVariable storeId: Long,
         @AuthenticationPrincipal userDetails: KioskUserDetails,
         @ResolvePageable(allowed = [SortField.CREATED_AT]) pageable: Pageable
-    ) = service.getMenuResponses(storeId = storeId, ownerInfo = userDetails.memberInfo, pageable)
+    ): Page<MenuResponse> {
+        return service.getMenuResponses(
+            storeId = storeId,
+            ownerInfo = userDetails.memberInfo,
+            pageable = pageable
+        )
+    }
 
     @GetMapping("/{menuId}/options")
     fun getOptions(
