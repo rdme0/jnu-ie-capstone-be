@@ -88,7 +88,7 @@ class MenuController(
             storeId = storeId,
             menuId = menuId,
             ownerInfo = userDetails.memberInfo,
-            pageable
+            pageable = pageable
         )
     }
 
