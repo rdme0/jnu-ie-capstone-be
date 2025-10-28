@@ -53,7 +53,7 @@ class MenuDevInitializer(
 
             val menus = (1..MENU_COUNT).map {
 
-                val name = "${MENUS[it % MENUS.size]} $it"
+                val name = MENUS[it % MENUS.size]
 
                 val embeddings = try {
                     util.embedVector(name, GeminiModel.GEMINI_EMBEDDING_001)
@@ -80,7 +80,7 @@ class MenuDevInitializer(
             val options = menus.map { menu ->
                 (1..OPTION_COUNT).map { index ->
                     Option.builder()
-                        .name(OptionName("${OPTIONS[index % OPTIONS.size]} $index"))
+                        .name(OptionName(OPTIONS[index % OPTIONS.size]))
                         .menu(menu)
                         .price(Price(Random.nextLong(3000)))
                         .build()

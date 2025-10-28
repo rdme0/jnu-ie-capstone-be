@@ -4,12 +4,15 @@ import jnu.ie.capstone.common.security.dto.KioskUserDetails
 import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
+import jnu.ie.capstone.session.event.ServerReadyEvent
+import jnu.ie.capstone.session.event.listener.SessionEventListener
 import jnu.ie.capstone.session.registry.WebSocketSessionRegistry
 import jnu.ie.capstone.session.service.KioskSessionService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import mu.KotlinLogging
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.statemachine.StateMachine
 import org.springframework.statemachine.config.StateMachineFactory
@@ -25,7 +28,8 @@ import kotlin.coroutines.cancellation.CancellationException
 class KioskAiSessionHandler(
     private val kioskSessionService: KioskSessionService,
     private val stateMachineFactory: StateMachineFactory<SessionState, SessionEvent>,
-    private val sessionRegistry: WebSocketSessionRegistry
+    private val sessionRegistry: WebSocketSessionRegistry,
+    private val eventPublisher: ApplicationEventPublisher
 ) : BinaryWebSocketHandler() {
     companion object {
         private val logger = KotlinLogging.logger {}
@@ -35,7 +39,7 @@ class KioskAiSessionHandler(
         ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
-        logger.info { "연결 성공 -> ${session.id}" }
+        logger.info { "연결 시작 -> ${session.id}" }
 
         sessionRegistry.register(session)
 
@@ -71,24 +75,34 @@ class KioskAiSessionHandler(
         logger.info { "쇼핑카트 생성 완료" }
 
         sessionScope.launch {
-            try {
-                kioskSessionService.processVoiceChunk(
-                    clientVoiceStream,
-                    storeId,
-                    userDetails.memberInfo,
-                    stateMachine,
-                    session,
-                    onVoiceChunk = { chunk ->
-                        if (session.isOpen) {
-                            session.sendMessage(BinaryMessage(chunk))
+            val rtzrReadySignal = CompletableDeferred<Unit>()
+
+            launch {
+                try {
+                    kioskSessionService.processVoiceChunk(
+                        rtzrReadySignal,
+                        clientVoiceStream,
+                        storeId,
+                        userDetails.memberInfo,
+                        stateMachine,
+                        session,
+                        onVoiceChunk = { chunk ->
+                            if (session.isOpen) {
+                                session.sendMessage(BinaryMessage(chunk))
+                            }
                         }
-                    }
-                )
-            } catch (_: CancellationException) {
-                logger.info { "세션 ${session.id} 처리가 정상적으로 취소되었습니다." }
-            } catch (e: Exception) {
-                logger.error(e) { "voice chunk 처리 중 에러 -> ${session.id}" }
+                    )
+                } catch (_: CancellationException) {
+                    logger.info { "세션 ${session.id} 처리가 정상적으로 취소되었습니다." }
+                } catch (e: Exception) {
+                    logger.error(e) { "voice chunk 처리 중 에러 -> ${session.id}" }
+                }
             }
+
+            rtzrReadySignal.await()
+
+            eventPublisher.publishEvent(ServerReadyEvent(source = this, sessionId = session.id))
+            logger.info { "클라이언트(${session.id})에게 준비 완료 신호 전송 (STT 연결 완료 후)" }
         }
 
         session.attributes["clientVoiceStream"] = clientVoiceStream
@@ -117,11 +131,12 @@ class KioskAiSessionHandler(
         sessionStateMachines.remove(session.id)
 
         sessionRegistry.unregister(session.id)
+
+        kioskSessionService.cleanupSession(session.id)
     }
 
     private fun initializeStateMachine(session: WebSocketSession): StateMachine<SessionState, SessionEvent> {
         val stateMachine = stateMachineFactory.getStateMachine(session.id)
-
         stateMachine.startReactively().subscribe()
 
         sessionStateMachines[session.id] = stateMachine
