@@ -3,19 +3,16 @@ package jnu.ie.capstone.session.event.listener
 import com.fasterxml.jackson.databind.ObjectMapper
 import jnu.ie.capstone.common.config.ApplicationCoroutineScope
 import jnu.ie.capstone.common.function.not
-import jnu.ie.capstone.session.dto.internal.StateChangeDTO
 import jnu.ie.capstone.session.dto.response.SessionResponse
-import jnu.ie.capstone.session.enums.SessionEvent
-import jnu.ie.capstone.session.enums.SessionState
 import jnu.ie.capstone.session.event.ApplicationSessionEvent
 import jnu.ie.capstone.session.event.EndOfGeminiTurnEvent
 import jnu.ie.capstone.session.event.OutputTextEvent
+import jnu.ie.capstone.session.event.ServerReadyEvent
 import jnu.ie.capstone.session.event.ShoppingCartUpdatedEvent
+import jnu.ie.capstone.session.event.StateChangeEvent
 import jnu.ie.capstone.session.registry.WebSocketSessionRegistry
 import kotlinx.coroutines.launch
 import org.springframework.context.event.EventListener
-import org.springframework.statemachine.StateContext
-import org.springframework.statemachine.annotation.OnStateChanged
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
@@ -29,6 +26,19 @@ class SessionEventListener(
 
     companion object {
         private val logger = mu.KotlinLogging.logger {}
+    }
+
+    @EventListener
+    fun handleServerReady(event: ServerReadyEvent) = scope.launch {
+        val session = getSession(event) ?: return@launch
+
+        val response = SessionResponse.fromServerReady()
+
+        val payload = mapper.writeValueAsString(response)
+
+        session.sendMessage(TextMessage(payload))
+
+        logger.info { "세션 ID ${event.sessionId}로 준비 완료 메시지 전송 완료" }
     }
 
     @EventListener
@@ -55,7 +65,7 @@ class SessionEventListener(
 
         session.sendMessage(TextMessage(payload))
 
-        logger.info { "세션 ID ${event.sessionId}로 GEMINI STT chunk 전송 완료" }
+        logger.debug { "세션 ID ${event.sessionId}로 GEMINI STT chunk 전송 완료" }
     }
 
     @EventListener
@@ -71,22 +81,18 @@ class SessionEventListener(
         logger.info { "세션 ID ${event.sessionId}로 GEMINI STT result 전송 완료" }
     }
 
+    @EventListener
+    fun handleStateChange(event: StateChangeEvent) {
+        scope.launch {
+            val session = getSession(event.sessionId) ?: return@launch
 
-    @OnStateChanged
-    fun onStateChanged(context: StateContext<SessionState, SessionEvent>) = scope.launch {
-        val session = getSession(context.stateMachine.id) ?: return@launch
+            val response = SessionResponse.fromStateChange(event.content)
+            val payload = mapper.writeValueAsString(response)
 
-        val fromState = context.source?.id
-        val toState = context.target.id
-        val because = context.event
+            session.sendMessage(TextMessage(payload))
 
-        val content = StateChangeDTO(fromState, toState, because)
-        val response = SessionResponse.fromStateChange(content)
-        val payload = mapper.writeValueAsString(response)
-
-        session.sendMessage(TextMessage(payload))
-
-        logger.info { "세션 ID ${session.id}로 state 변경 메시지 전송 완료" }
+            logger.info { "세션 ID ${event.sessionId}로 state 변경 메시지 전송 완료 (${event.content.from} -> ${event.content.to})" }
+        }
     }
 
 
