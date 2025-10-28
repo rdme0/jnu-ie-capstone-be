@@ -2,7 +2,9 @@ package jnu.ie.capstone.session.event
 
 import jnu.ie.capstone.session.dto.internal.OutputTextChunkDTO
 import jnu.ie.capstone.session.dto.internal.OutputTextResultDTO
+import jnu.ie.capstone.session.dto.internal.ServerReadyDTO
 import jnu.ie.capstone.session.dto.internal.ShoppingCartResponseDTO
+import jnu.ie.capstone.session.dto.internal.StateChangeDTO
 import jnu.ie.capstone.session.dto.response.SessionResponseContent
 import org.springframework.context.ApplicationEvent
 
@@ -11,6 +13,18 @@ sealed class ApplicationSessionEvent(
     open val sessionId: String,
     open val content: SessionResponseContent
 ) : ApplicationEvent(source)
+
+class ServerReadyEvent(
+    source: Any,
+    override val sessionId: String,
+    override val content: ServerReadyDTO = ServerReadyDTO()
+) : ApplicationSessionEvent(source, sessionId, content)
+
+class StateChangeEvent(
+    source: Any,
+    override val sessionId: String,
+    override val content: StateChangeDTO
+) : ApplicationSessionEvent(source, sessionId, content)
 
 class ShoppingCartUpdatedEvent(
     source: Any,
