@@ -1,5 +1,4 @@
 spring:
-  config.activate.on-profile: dev
   datasource:
     url: jdbc:postgresql://localhost:15432/kiosk
     username: postgres
@@ -9,3 +8,12 @@ spring:
     properties.hibernate.format_sql: true
     defer-datasource-initialization: true
     hibernate.ddl-auto: update
+  
+  data:
+    redis:
+      host: localhost
+      port: 16379
+
+logging:
+  level:
+    org.hibernate.SQL: debug
