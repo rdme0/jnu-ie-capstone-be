@@ -1,7 +1,6 @@
 spring.security.oauth2.client:
   registration:
     kakao:
-      redirect-uri: ${DEV_URL}/login/oauth2/code/kakao
       client-authentication-method: client_secret_post
       authorization-grant-type: authorization_code
       client-secret: ${KAKAO_CLIENT_SECRET}
