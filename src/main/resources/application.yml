@@ -11,4 +11,5 @@ spring:
       - classpath:config/application-prompt.yml
 
 server:
+  forward-headers-strategy: native
   port: 18080
