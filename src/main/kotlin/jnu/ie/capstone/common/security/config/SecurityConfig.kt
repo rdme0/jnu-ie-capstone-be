@@ -3,8 +3,10 @@ package jnu.ie.capstone.common.security.config
 import jnu.ie.capstone.common.security.filter.JwtAuthFilter
 import jnu.ie.capstone.common.security.oauth.handler.OAuth2SuccessHandler
 import jnu.ie.capstone.common.security.oauth.service.KioskOAuth2UserService
+import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.Ordered
 import org.springframework.messaging.Message
 import org.springframework.messaging.MessageChannel
 import org.springframework.messaging.support.ChannelInterceptor
@@ -18,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
+import org.springframework.web.filter.ForwardedHeaderFilter
 
 @Configuration
 @EnableWebSecurity
@@ -45,6 +48,14 @@ class SecurityConfig(
         val source = UrlBasedCorsConfigurationSource()
         source.registerCorsConfiguration("/**", configuration)
         return source
+    }
+
+    @Bean
+    fun forwardedHeaderFilter(): FilterRegistrationBean<ForwardedHeaderFilter> {
+        val filter = ForwardedHeaderFilter()
+        val registration = FilterRegistrationBean(filter)
+        registration.order = Ordered.HIGHEST_PRECEDENCE
+        return registration
     }
 
     @Bean
