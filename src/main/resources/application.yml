@@ -6,10 +6,8 @@ spring:
   config:
     import:
       - classpath:config/application-security.yml
-      - classpath:config/application-dev-db.yml
       - classpath:config/application-gemini.yml
       - classpath:config/application-rtzr.yml
-      - classpath:config/application-dev-redis.yml
       - classpath:config/application-prompt.yml
 
 server:
