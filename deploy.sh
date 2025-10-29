@@ -3,7 +3,7 @@ set -e  # 에러 발생 시 즉시 종료
 
 APP_NAME="capstone"
 JAR_PATH="$(pwd)/build/libs"
-JAR_FILE=$(ls $JAR_PATH/*.jar | head -n 1)
+JAR_FILE=$(ls $JAR_PATH/*.jar | grep -v 'plain' | head -n 1)
 LOG_PATH="/var/log/$APP_NAME"
 PID_FILE="/tmp/$APP_NAME.pid"
 
