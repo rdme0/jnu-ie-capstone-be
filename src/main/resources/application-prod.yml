@@ -11,6 +11,7 @@ spring:
     redis:
       host: ${PROD_REDIS_URL}
       port: ${PROD_REDIS_PORT}
+      password: ${PROD_REDIS_PASSWORD}
 
 spring.security.oauth2.client:
   registration:
