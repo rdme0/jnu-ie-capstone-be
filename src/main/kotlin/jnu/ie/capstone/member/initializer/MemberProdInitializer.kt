@@ -1,8 +1,6 @@
 package jnu.ie.capstone.member.initializer
 
-import jnu.ie.capstone.common.security.util.JwtUtil
 import jnu.ie.capstone.member.constant.MemberConstant.TEST_EMAIL
-import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.member.model.entity.Member
 import jnu.ie.capstone.member.model.vo.Oauth2Provider
 import jnu.ie.capstone.member.repository.MemberRepository
@@ -19,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional
 @Profile("prod")
 class MemberProdInitializer(
     private val memberRepository: MemberRepository,
-    private val jwtUtil: JwtUtil
 ) {
 
     private companion object {
@@ -29,19 +26,18 @@ class MemberProdInitializer(
     @Transactional
     @EventListener(ApplicationReadyEvent::class)
     fun init() {
-        val member = memberRepository.findByEmail(TEST_EMAIL)
+        memberRepository.findByEmail(TEST_EMAIL)
             ?: run {
+                logger.info { "테스트 member 저장 중" }
                 val testMember = Member.builder()
                     .provider(Oauth2Provider.KAKAO)
                     .email(TEST_EMAIL)
                     .build()
 
                 memberRepository.save(testMember)
+
+                logger.info { "테스트 member 저장 완료" }
             }
-
-        val accessToken = MemberInfo.from(member).let { jwtUtil.generateToken(it) }
-
-        logger.info { "테스트 member accessToken -> $accessToken" }
     }
 
 }
