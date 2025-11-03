@@ -23,5 +23,5 @@ auth:
   allowed-front-end-origins:
     - http://localhost:*
     - https://localhost:*
-  success-uri: /auth/success
+  success-uri: /
 
