@@ -2,19 +2,21 @@ package jnu.ie.capstone.common.security.oauth.handler
 
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import jnu.ie.capstone.common.security.config.UriSecurityConfig
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
+import jnu.ie.capstone.common.security.filter.RedirectParamFilter
 import jnu.ie.capstone.common.security.util.JwtUtil
-import org.springframework.beans.factory.annotation.Value
+import jnu.ie.capstone.common.util.CookieUtil.removeCookie
 import org.springframework.security.core.Authentication
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler
 import org.springframework.stereotype.Component
 import org.springframework.web.util.UriComponentsBuilder
+import org.springframework.web.util.WebUtils
 
 
 @Component
 class OAuth2SuccessHandler(
-    @param:Value("\${auth.success-uri}")
-    val successUri: String,
+    private val config: UriSecurityConfig,
     private val jwtUtil: JwtUtil
 ) : AuthenticationSuccessHandler {
 
@@ -29,9 +31,23 @@ class OAuth2SuccessHandler(
                 return
             }
         val accessToken: String = jwtUtil.generateToken(userDetails.memberInfo)
-        val redirectUrl = UriComponentsBuilder.fromUriString(successUri)
+
+        val redirectOrigin: String = WebUtils
+            .getCookie(request, RedirectParamFilter.REDIRECT_ORIGIN_KEY)
+            ?.value
+            ?: config.defaultRedirectOrigin
+
+        removeCookie(
+            request = request,
+            response = response,
+            key = RedirectParamFilter.REDIRECT_ORIGIN_KEY
+        )
+
+        val redirectUrl = UriComponentsBuilder.fromUriString(redirectOrigin)
+            .path(config.successPath)
             .queryParam("accessToken", accessToken)
-            .build().toUriString()
+            .build()
+            .toUriString()
 
         response.sendRedirect(redirectUrl)
     }
