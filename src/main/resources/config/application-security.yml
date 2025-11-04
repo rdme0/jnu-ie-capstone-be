@@ -19,9 +19,9 @@ spring.security.oauth2.client:
 aes256.key: ${AES256_KEY}
 jwt.secret-key: ${JWT_SECRET_KEY}
 
-auth:
+uri:
   allowed-front-end-origins:
     - http://localhost:*
     - https://localhost:*
-  success-uri: /
-
+  success-path: /auth/success
+  default-redirect-origin: http://localhost:3000
