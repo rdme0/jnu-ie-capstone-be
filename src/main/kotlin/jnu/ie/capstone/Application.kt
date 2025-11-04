@@ -1,7 +1,7 @@
 package jnu.ie.capstone
 
 import jnu.ie.capstone.rtzr.config.RtzrConfig
-import jnu.ie.capstone.common.security.config.AllowedOriginsProperties
+import jnu.ie.capstone.common.security.config.UriSecurityConfig
 import jnu.ie.capstone.gemini.config.GeminiConfig
 import jnu.ie.capstone.gemini.config.PromptConfig
 import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -14,7 +14,7 @@ import org.springframework.data.web.config.EnableSpringDataWebSupport
 @EnableJpaAuditing
 @EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 @EnableConfigurationProperties(
-    AllowedOriginsProperties::class,
+    UriSecurityConfig::class,
     GeminiConfig::class,
     RtzrConfig::class,
     PromptConfig::class
