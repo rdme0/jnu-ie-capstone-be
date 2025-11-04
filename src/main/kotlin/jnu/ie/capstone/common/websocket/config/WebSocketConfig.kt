@@ -1,6 +1,6 @@
 package jnu.ie.capstone.common.websocket.config
 
-import jnu.ie.capstone.common.security.config.AllowedOriginsProperties
+import jnu.ie.capstone.common.security.config.UriSecurityConfig
 import jnu.ie.capstone.common.websocket.interceptor.JwtAuthHandshakeInterceptor
 import jnu.ie.capstone.common.websocket.interceptor.StoreIdHandshakeInterceptor
 import jnu.ie.capstone.session.handler.KioskAiSessionHandler
@@ -12,7 +12,7 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @Configuration
 @EnableWebSocket
 class WebSocketConfig(
-    private val originsProperties: AllowedOriginsProperties,
+    private val originsProperties: UriSecurityConfig,
     private val authInterceptor: JwtAuthHandshakeInterceptor,
     private val storeIdHandshakeInterceptor: StoreIdHandshakeInterceptor,
     private val handler: KioskAiSessionHandler
