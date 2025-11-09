@@ -19,13 +19,16 @@ class JwtAuthHelper(
         private const val BEARER_PREFIX = "Bearer "
     }
 
-    fun authenticate(authHeader: String?): Authentication {
+    fun authenticate(authHeader: String?, isBearer: Boolean = true): Authentication {
         authHeader ?: throw UnauthorizedException()
 
-        if (!authHeader.startsWith(BEARER_PREFIX))
-            throw UnauthorizedException()
+        val token = if (isBearer) {
+            if (!authHeader.startsWith(BEARER_PREFIX)) throw UnauthorizedException()
 
-        val token = authHeader.removePrefix(BEARER_PREFIX)
+            authHeader.removePrefix(BEARER_PREFIX)
+        } else {
+            authHeader
+        }
 
         if (!jwtUtil.validateToken(token))
             throw UnauthorizedException()

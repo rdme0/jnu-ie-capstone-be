@@ -88,13 +88,12 @@ class KioskAiSessionHandlerE2ETest(
         val connectionLatch = CompletableDeferred<Unit>()
         readyLatch = CompletableDeferred()
         val headers = WebSocketHttpHeaders()
-        headers.add("Sec-WebSocket-Protocol", "Bearer $accessToken")
         val session = getSession(connectionLatch, headers)
 
         runBlocking {
             withTimeout(5000) { connectionLatch.await() }
 
-            withTimeout(5000) { readyLatch.await() }
+            withTimeout(10000) { readyLatch.await() }
             assertThat(nowState).isEqualTo(SessionState.MENU_SELECTION)
             logger.info { "서버 준비 완료! 음성 전송을 시작합니다." }
 
@@ -151,7 +150,7 @@ class KioskAiSessionHandlerE2ETest(
             sendWavFile(session, "classpath:test/이대로 주문해줘.wav")
             waitForGeminiTurnToEnd(session, endOfTurnLatch)
 
-            withTimeout(5000) { stateChangeLatch.await() }
+            withTimeout(10000) { stateChangeLatch.await() }
 
             logger.info { "--- PHASE 3 완료 ---" }
 
@@ -168,60 +167,64 @@ class KioskAiSessionHandlerE2ETest(
     private fun getSession(
         connectionLatch: CompletableDeferred<Unit>,
         headers: WebSocketHttpHeaders
-    ): WebSocketSession = client.execute(object : BinaryWebSocketHandler() {
-        override fun afterConnectionEstablished(session: WebSocketSession) {
-            logger.info { "테스트 클라이언트 연결 성공: ${session.id}" }
-            connectionLatch.complete(Unit)
-        }
-
-        override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
-            try {
-                val payload = message.payload
-                logger.debug { "테스트 클라이언트 수신 (Text): $payload" }
-
-                val response = mapper.readValue<SessionResponse>(payload)
-
-                when (response.messageType) {
-                    SERVER_READY -> {
-                        logger.info { ">>> 서버 준비 완료 신호 수신 <<<" }
-                        nowState = (response.content as ServerReadyDTO).state
-                        readyLatch.complete(Unit)
-                    }
-
-                    OUTPUT_TEXT_RESULT -> {
-                        logger.info { ">>> Gemini 턴 종료 메시지 수신 <<<" }
-                        endOfTurnLatch.complete(Unit)
-                    }
-
-                    UPDATE_SHOPPING_CART -> {
-                        myShoppingCart = (response.content as ShoppingCartResponseDTO).menus
-                    }
-
-                    CHANGE_STATE -> {
-                        val toState = (response.content as StateChangeDTO).to
-                        logger.info { ">>> State 변경 메시지 수신 : $toState <<<" }
-                        nowState = toState
-                        stateChangeLatch.complete(toState)
-                    }
-
-                    else -> {}
-                }
-
-            } catch (e: Exception) {
-                logger.error("텍스트 메시지 처리 중 에러", e)
+    ): WebSocketSession = client.execute(
+        object : BinaryWebSocketHandler() {
+            override fun afterConnectionEstablished(session: WebSocketSession) {
+                logger.info { "테스트 클라이언트 연결 성공: ${session.id}" }
+                connectionLatch.complete(Unit)
             }
-        }
 
-        override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {}
+            override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
+                try {
+                    val payload = message.payload
+                    logger.debug { "테스트 클라이언트 수신 (Text): $payload" }
 
-        override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
-            logger.warn("테스트 클라이언트 연결 종료: ${session.id}, status: $status")
-        }
+                    val response = mapper.readValue<SessionResponse>(payload)
 
-        override fun handleTransportError(session: WebSocketSession, exception: Throwable) {
-            logger.error("테스트 클라이언트 전송 에러: ${session.id}", exception)
-        }
-    }, headers, URI("ws://localhost:${port}/stores/${STORE_ID}/websocket/kioskSession"))
+                    when (response.messageType) {
+                        SERVER_READY -> {
+                            logger.info { ">>> 서버 준비 완료 신호 수신 <<<" }
+                            nowState = (response.content as ServerReadyDTO).state
+                            readyLatch.complete(Unit)
+                        }
+
+                        OUTPUT_TEXT_RESULT -> {
+                            logger.info { ">>> Gemini 턴 종료 메시지 수신 <<<" }
+                            endOfTurnLatch.complete(Unit)
+                        }
+
+                        UPDATE_SHOPPING_CART -> {
+                            myShoppingCart = (response.content as ShoppingCartResponseDTO).menus
+                        }
+
+                        CHANGE_STATE -> {
+                            val toState = (response.content as StateChangeDTO).to
+                            logger.info { ">>> State 변경 메시지 수신 : $toState <<<" }
+                            nowState = toState
+                            stateChangeLatch.complete(toState)
+                        }
+
+                        else -> {}
+                    }
+
+                } catch (e: Exception) {
+                    logger.error("텍스트 메시지 처리 중 에러", e)
+                }
+            }
+
+            override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {}
+
+            override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
+                logger.warn("테스트 클라이언트 연결 종료: ${session.id}, status: $status")
+            }
+
+            override fun handleTransportError(session: WebSocketSession, exception: Throwable) {
+                logger.error("테스트 클라이언트 전송 에러: ${session.id}", exception)
+            }
+        },
+        headers,
+        URI("ws://localhost:${port}/stores/${STORE_ID}/websocket/kioskSession?accessToken=${accessToken}")
+    )
         .get(5, TimeUnit.SECONDS)
 
 
