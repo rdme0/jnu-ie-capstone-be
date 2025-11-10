@@ -13,5 +13,4 @@ data class RtzrConfig(
     val modelName: String,
     val domain : String,
     val language : String,
-    val useDisfluencyFilter: Boolean
 )
