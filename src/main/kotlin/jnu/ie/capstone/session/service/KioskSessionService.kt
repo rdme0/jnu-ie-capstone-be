@@ -120,6 +120,7 @@ class KioskSessionService(
                 .onEach { logger.debug { "rtzr stt -> ${it.alternatives.first().text}" } }
                 .filter { it.final }
                 .map { it.alternatives.first().text }
+                .filter { it.isNotBlank() }
                 .map { menuService.getMenuRelevant(text = it, storeId, ownerInfo) }
                 .map { Text(MenuSelectionContext(menus = it, shoppingCart = shoppingCart)) }
         }
