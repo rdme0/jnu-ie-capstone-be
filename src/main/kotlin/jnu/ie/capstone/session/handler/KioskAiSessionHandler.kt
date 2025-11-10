@@ -39,7 +39,6 @@ class KioskAiSessionHandler(
     private val sessionStateMachines =
         ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
 
-    @OptIn(InternalCoroutinesApi::class)
     override fun afterConnectionEstablished(session: WebSocketSession) {
         logger.info { "연결 시작 -> ${session.id}" }
 
