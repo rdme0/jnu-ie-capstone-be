@@ -39,7 +39,7 @@ class GeminiLiveClient(
     suspend fun getLiveResponse(
         inputData: Flow<GeminiInput>,
         prompt: String,
-        model: GeminiModel = GeminiModel.GEMINI_2_5_FLASH_LIVE
+        model: GeminiModel = GeminiModel.GEMINI_2_5_FLASH_NATIVE_AUDIO
     ): Flow<GeminiOutput> {
         return try {
             callbackFlow {
