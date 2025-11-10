@@ -3,6 +3,7 @@ package jnu.ie.capstone.session.event.listener
 import com.fasterxml.jackson.databind.ObjectMapper
 import jnu.ie.capstone.common.config.ApplicationCoroutineScope
 import jnu.ie.capstone.common.function.not
+import jnu.ie.capstone.common.websocket.util.WebSocketReplier
 import jnu.ie.capstone.session.dto.response.SessionResponse
 import jnu.ie.capstone.session.event.ApplicationSessionEvent
 import jnu.ie.capstone.session.event.EndOfGeminiTurnEvent
@@ -32,26 +33,22 @@ class SessionEventListener(
     fun handleServerReady(event: ServerReadyEvent) = scope.launch {
         val session = getSession(event) ?: return@launch
 
+        val replier = getReplier(session) ?: return@launch
+
         val response = SessionResponse.fromServerReady()
 
-        val payload = mapper.writeValueAsString(response)
-
-        session.sendMessage(TextMessage(payload))
-
-        logger.info { "세션 ID ${event.sessionId}로 준비 완료 메시지 전송 완료" }
+        replyText(response, replier, event)
     }
 
     @EventListener
     fun handleShoppingCartUpdate(event: ShoppingCartUpdatedEvent) = scope.launch {
         val session = getSession(event) ?: return@launch
 
+        val replier = getReplier(session) ?: return@launch
+
         val response = SessionResponse.fromUpdateShoppingCart(event.content)
 
-        val payload = mapper.writeValueAsString(response)
-
-        session.sendMessage(TextMessage(payload))
-
-        logger.info { "세션 ID ${event.sessionId}로 장바구니 업데이트 전송 완료." }
+        replyText(response, replier, event)
     }
 
 
@@ -59,26 +56,22 @@ class SessionEventListener(
     fun handleOutputText(event: OutputTextEvent) = scope.launch {
         val session = getSession(event) ?: return@launch
 
+        val replier = getReplier(session) ?: return@launch
+
         val response = SessionResponse.fromOutputText(event.content)
 
-        val payload = mapper.writeValueAsString(response)
-
-        session.sendMessage(TextMessage(payload))
-
-        logger.debug { "세션 ID ${event.sessionId}로 GEMINI STT chunk 전송 완료" }
+        replyText(response, replier, event)
     }
 
     @EventListener
     fun handleEndOfGeminiTurn(event: EndOfGeminiTurnEvent) = scope.launch {
         val session = getSession(event) ?: return@launch
 
+        val replier = getReplier(session) ?: return@launch
+
         val response = SessionResponse.fromEndOfGeminiTurn(event.content)
 
-        val payload = mapper.writeValueAsString(response)
-
-        session.sendMessage(TextMessage(payload))
-
-        logger.info { "세션 ID ${event.sessionId}로 GEMINI STT result 전송 완료" }
+        replyText(response, replier, event)
     }
 
     @EventListener
@@ -86,12 +79,11 @@ class SessionEventListener(
         scope.launch {
             val session = getSession(event.sessionId) ?: return@launch
 
+            val replier = getReplier(session) ?: return@launch
+
             val response = SessionResponse.fromStateChange(event.content)
-            val payload = mapper.writeValueAsString(response)
 
-            session.sendMessage(TextMessage(payload))
-
-            logger.info { "세션 ID ${event.sessionId}로 state 변경 메시지 전송 완료 (${event.content.from} -> ${event.content.to})" }
+            replyText(response, replier, event)
         }
     }
 
@@ -115,4 +107,32 @@ class SessionEventListener(
         return getSession(event.sessionId)
     }
 
+    private fun getReplier(session: WebSocketSession): WebSocketReplier? {
+        return session.attributes["replier"] as? WebSocketReplier ?: run {
+            logger.warn { ">>> replier not found. sessionId: ${session.id}" }
+            return null
+        }
+    }
+
+    private suspend fun replyText(
+        response: SessionResponse,
+        replier: WebSocketReplier,
+        event: ApplicationSessionEvent
+    ) {
+        val payload = mapper.writeValueAsString(response)
+
+        logger.debug { ">>> response payload: $payload" }
+
+        val result = replier.send(TextMessage(payload))
+
+        when {
+            result.isSuccess -> {
+                logger.info { "세션 ID ${event.sessionId}로 ${event.content} 메시지 전송 성공" }
+            }
+
+            result.isFailure -> {
+                logger.warn(result.exceptionOrNull()) { "세션 ID ${event.sessionId}로  ${event.content} 메시지 전송 실패" }
+            }
+        }
+    }
 }
