@@ -127,11 +127,11 @@ class SessionEventListener(
 
         when {
             result.isSuccess -> {
-                logger.info { "세션 ID ${event.sessionId}로 ${event.content} 메시지 전송 성공" }
+                logger.info { "세션 ID ${event.sessionId}로 ${response.messageType} 메시지 전송 성공" }
             }
 
             result.isFailure -> {
-                logger.warn(result.exceptionOrNull()) { "세션 ID ${event.sessionId}로  ${event.content} 메시지 전송 실패" }
+                logger.warn(result.exceptionOrNull()) { "세션 ID ${event.sessionId}로  ${response.messageType} 메시지 전송 실패" }
             }
         }
     }
