@@ -39,7 +39,6 @@ class KioskAiSessionHandler(
     private val sessionStateMachines =
         ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
 
-    @OptIn(InternalCoroutinesApi::class)
     override fun afterConnectionEstablished(session: WebSocketSession) {
         logger.info { "연결 시작 -> ${session.id}" }
 
@@ -129,7 +128,7 @@ class KioskAiSessionHandler(
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         logger.info { "Client disconnected: ${session.id}, code: ${status.code}, reason: ${status.reason}" }
 
-        (session.attributes["sender"] as? WebSocketReplier)?.close()
+        (session.attributes["replier"] as? WebSocketReplier)?.close()
 
         (session.attributes["sessionScope"] as? CoroutineScope)?.cancel()
 
