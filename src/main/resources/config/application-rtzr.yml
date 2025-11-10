@@ -8,4 +8,3 @@ rtzr:
   model-name: sommers_ko
   domain: MEETING
   language: ko
-  use_disfluency_filter: true
