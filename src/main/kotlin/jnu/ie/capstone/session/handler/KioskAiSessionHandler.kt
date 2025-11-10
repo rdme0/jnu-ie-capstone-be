@@ -1,11 +1,12 @@
 package jnu.ie.capstone.session.handler
 
+import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
+import jnu.ie.capstone.common.websocket.util.WebSocketReplier
 import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
 import jnu.ie.capstone.session.event.ServerReadyEvent
-import jnu.ie.capstone.session.event.listener.SessionEventListener
 import jnu.ie.capstone.session.registry.WebSocketSessionRegistry
 import jnu.ie.capstone.session.service.KioskSessionService
 import kotlinx.coroutines.*
@@ -38,6 +39,7 @@ class KioskAiSessionHandler(
     private val sessionStateMachines =
         ConcurrentHashMap<String, StateMachine<SessionState, SessionEvent>>()
 
+    @OptIn(InternalCoroutinesApi::class)
     override fun afterConnectionEstablished(session: WebSocketSession) {
         logger.info { "연결 시작 -> ${session.id}" }
 
@@ -49,10 +51,18 @@ class KioskAiSessionHandler(
 
         val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+        session.attributes["sessionScope"] = sessionScope
+
+        val replier = WebSocketReplier(session, sessionScope)
+
+        session.attributes["replier"] = replier
+
         val clientVoiceStream = MutableSharedFlow<ByteArray>(
-            extraBufferCapacity = 128,
+            extraBufferCapacity = 128, // 0.1초 마다 청크 보낼 시 12.8초 정도 저장 가능
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
+
+        session.attributes["clientVoiceStream"] = clientVoiceStream
 
         val authentication = session.attributes["principal"] as? UsernamePasswordAuthenticationToken
 
@@ -86,11 +96,7 @@ class KioskAiSessionHandler(
                         userDetails.memberInfo,
                         stateMachine,
                         session,
-                        onVoiceChunk = { chunk ->
-                            if (session.isOpen) {
-                                session.sendMessage(BinaryMessage(chunk))
-                            }
-                        }
+                        onVoiceChunk = replyVoiceChunk(session)
                     )
                 } catch (_: CancellationException) {
                     logger.info { "세션 ${session.id} 처리가 정상적으로 취소되었습니다." }
@@ -104,9 +110,6 @@ class KioskAiSessionHandler(
             eventPublisher.publishEvent(ServerReadyEvent(source = this, sessionId = session.id))
             logger.info { "클라이언트(${session.id})에게 준비 완료 신호 전송 (STT 연결 완료 후)" }
         }
-
-        session.attributes["clientVoiceStream"] = clientVoiceStream
-        session.attributes["sessionScope"] = sessionScope
     }
 
     override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
@@ -126,6 +129,8 @@ class KioskAiSessionHandler(
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         logger.info { "Client disconnected: ${session.id}, code: ${status.code}, reason: ${status.reason}" }
 
+        (session.attributes["sender"] as? WebSocketReplier)?.close()
+
         (session.attributes["sessionScope"] as? CoroutineScope)?.cancel()
 
         sessionStateMachines.remove(session.id)
@@ -143,4 +148,17 @@ class KioskAiSessionHandler(
         return stateMachine
     }
 
+    private fun replyVoiceChunk(session: WebSocketSession): suspend (ByteArray) -> Unit =
+        { chunk ->
+            val replier = session.attributes["replier"] as? WebSocketReplier
+
+            val result: Result<Unit> = replier
+                ?.send(BinaryMessage(chunk))
+                ?: Result.failure(
+                    InternalServerException(IllegalStateException("replier가 세션에 없음 -> ${session.id}"))
+                )
+
+            if (result.isFailure)
+                logger.warn(result.exceptionOrNull()) { "메세지 전송 실패 -> ${session.id}" }
+        }
 }
