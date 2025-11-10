@@ -18,7 +18,3 @@ spring.security.oauth2.client:
   registration:
     kakao:
       redirect-uri: ${DEV_URL}/login/oauth2/code/kakao
-
-logging:
-  level:
-    org.hibernate.SQL: debug
