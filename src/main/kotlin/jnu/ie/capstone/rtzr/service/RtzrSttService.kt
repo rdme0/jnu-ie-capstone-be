@@ -5,6 +5,7 @@ import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.rtzr.cache.service.RtzrAccessTokenService
 import jnu.ie.capstone.rtzr.client.RtzrSttClient
 import jnu.ie.capstone.rtzr.dto.client.response.RtzrSttResponse
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -46,6 +47,9 @@ class RtzrSttService(
                         continue
                     } else throw InternalServerException(e)
 
+                } catch (e: CancellationException) {
+                    logger.info(e) { "RtzrSttService flow was cancelled." }
+                    throw e
                 } catch (e: Exception) {
                     throw InternalServerException(e)
                 }

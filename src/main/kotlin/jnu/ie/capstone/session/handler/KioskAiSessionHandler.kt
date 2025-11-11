@@ -32,8 +32,16 @@ class KioskAiSessionHandler(
     private val sessionRegistry: WebSocketSessionRegistry,
     private val eventPublisher: ApplicationEventPublisher
 ) : BinaryWebSocketHandler() {
-    companion object {
-        private val logger = KotlinLogging.logger {}
+
+    private companion object {
+        const val SESSION_SCOPE_KEY = "sessionScope"
+        const val CLIENT_VOICE_STREAM_KEY = "clientVoiceStream"
+        const val SHOPPING_CART_KEY = "shoppingCart"
+        const val REPLIER_KEY = "replier"
+        const val PRINCIPAL_KEY = "principal"
+        const val STORE_ID_KEY = "storeId"
+
+        val logger = KotlinLogging.logger {}
     }
 
     private val sessionStateMachines =
@@ -50,36 +58,36 @@ class KioskAiSessionHandler(
 
         val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        session.attributes["sessionScope"] = sessionScope
+        session.attributes[SESSION_SCOPE_KEY] = sessionScope
 
         val replier = WebSocketReplier(session, sessionScope)
 
-        session.attributes["replier"] = replier
+        session.attributes[REPLIER_KEY] = replier
 
         val clientVoiceStream = MutableSharedFlow<ByteArray>(
             extraBufferCapacity = 128, // 0.1초 마다 청크 보낼 시 12.8초 정도 저장 가능
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
-        session.attributes["clientVoiceStream"] = clientVoiceStream
+        session.attributes[CLIENT_VOICE_STREAM_KEY] = clientVoiceStream
 
-        val authentication = session.attributes["principal"] as? UsernamePasswordAuthenticationToken
+        val authentication = session.attributes[PRINCIPAL_KEY] as? UsernamePasswordAuthenticationToken
 
         val userDetails = authentication?.principal as? KioskUserDetails
             ?: run {
-                logger.error { "올바르지 않은 authentication -> ${session.attributes["principal"]}" }
+                logger.error { "올바르지 않은 authentication -> ${session.attributes[PRINCIPAL_KEY]}" }
                 session.close(CloseStatus.POLICY_VIOLATION)
                 return
             }
 
-        val storeId = session.attributes["storeId"] as? Long
+        val storeId = session.attributes[STORE_ID_KEY] as? Long
             ?: run {
-                logger.error { "올바르지 않은 storeId -> ${session.attributes["storeId"]}" }
+                logger.error { "올바르지 않은 storeId -> ${session.attributes[STORE_ID_KEY]}" }
                 session.close(CloseStatus.BAD_DATA)
                 return
             }
 
-        session.attributes["shoppingCart"] = ShoppingCartDTO(mutableListOf())
+        session.attributes[SHOPPING_CART_KEY] = ShoppingCartDTO(mutableListOf())
 
         logger.info { "쇼핑카트 생성 완료" }
 
@@ -113,7 +121,7 @@ class KioskAiSessionHandler(
 
     override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
         val clientVoiceStream =
-            session.attributes["clientVoiceStream"] as? MutableSharedFlow<ByteArray>
+            session.attributes[CLIENT_VOICE_STREAM_KEY] as? MutableSharedFlow<ByteArray>
 
         val bytes = ByteArray(message.payload.remaining())
         message.payload.get(bytes)
@@ -128,9 +136,9 @@ class KioskAiSessionHandler(
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         logger.info { "Client disconnected: ${session.id}, code: ${status.code}, reason: ${status.reason}" }
 
-        (session.attributes["replier"] as? WebSocketReplier)?.close()
+        (session.attributes[REPLIER_KEY] as? WebSocketReplier)?.close()
 
-        (session.attributes["sessionScope"] as? CoroutineScope)?.cancel()
+        (session.attributes[SESSION_SCOPE_KEY] as? CoroutineScope)?.cancel()
 
         sessionStateMachines.remove(session.id)
 
@@ -149,7 +157,7 @@ class KioskAiSessionHandler(
 
     private fun replyVoiceChunk(session: WebSocketSession): suspend (ByteArray) -> Unit =
         { chunk ->
-            val replier = session.attributes["replier"] as? WebSocketReplier
+            val replier = session.attributes[REPLIER_KEY] as? WebSocketReplier
 
             val result: Result<Unit> = replier
                 ?.send(BinaryMessage(chunk))
