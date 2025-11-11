@@ -1,12 +1,13 @@
 package jnu.ie.capstone.rtzr.client
 
-import jnu.ie.capstone.rtzr.client.handler.RtzrSttWebSocketHandler
 import jnu.ie.capstone.rtzr.config.RtzrConfig
 import jnu.ie.capstone.rtzr.dto.client.response.RtzrAuthResponse
 import jnu.ie.capstone.rtzr.dto.client.response.RtzrSttResponse
+import jnu.ie.capstone.rtzr.factory.RtzrSttWebsocketHandlerFactory
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.future.await
@@ -25,21 +26,20 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient
 import org.springframework.web.util.UriComponents
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
-import kotlin.jvm.java
 
 @Component
 class RtzrSttClient(
     private val config: RtzrConfig,
-    private val handler: RtzrSttWebSocketHandler,
-    private val rtzrChannel: ReceiveChannel<RtzrSttResponse>
+    private val handlerFactory: RtzrSttWebsocketHandlerFactory
 ) {
-    private companion object {
-        val END_OF_STREAM = TextMessage("EOS")
-    }
 
-    private val logger = KotlinLogging.logger {}
-    private val restClient = WebClient.builder().build()
-    private val wsClient = StandardWebSocketClient()
+    private companion object {
+        const val BUFFER_SIZE = 512
+        val END_OF_STREAM = TextMessage("EOS")
+        val logger = KotlinLogging.logger {}
+        val restClient = WebClient.builder().build()
+        val wsClient = StandardWebSocketClient()
+    }
 
     suspend fun auth(): RtzrAuthResponse {
         return restClient.post()
@@ -57,6 +57,9 @@ class RtzrSttClient(
         scope: CoroutineScope,
         rtzrReadySignal: CompletableDeferred<Unit>
     ): Flow<RtzrSttResponse> {
+        val channel = getChannel()
+
+        val handler = handlerFactory.createHandler(channel)
 
         val session = wsClient.execute(
             handler,
@@ -78,7 +81,11 @@ class RtzrSttClient(
                 session.close()
             }
         }
-        return rtzrChannel.consumeAsFlow()
+        return channel.consumeAsFlow()
+    }
+
+    private fun getChannel(): Channel<RtzrSttResponse> {
+        return Channel(capacity = BUFFER_SIZE, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     }
 
     private fun getAuthBody(): LinkedMultiValueMap<String, String> {
