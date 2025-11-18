@@ -13,7 +13,8 @@ interface MenuRepository : JpaRepository<Menu, Long> {
     fun findByStoreId(storeId: Long): List<Menu>
     fun findByStoreId(storeId: Long, pageable: Pageable): Page<Menu>
     fun findByStoreIdAndId(storeId: Long, id: Long): Menu?
-    fun deleteByIdIn(ids: List<Long>)
+
+    fun deleteByStoreId(storeId: Long)
 
     @Query(
         value = """
