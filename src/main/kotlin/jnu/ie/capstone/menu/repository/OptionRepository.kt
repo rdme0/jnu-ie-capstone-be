@@ -19,4 +19,6 @@ interface OptionRepository : JpaRepository<Option, Long> {
 
     fun deleteAllByMenuId(menuId: Long)
 
+    fun deleteAllByMenuIdIn(menuIds: List<Long>)
+
 }

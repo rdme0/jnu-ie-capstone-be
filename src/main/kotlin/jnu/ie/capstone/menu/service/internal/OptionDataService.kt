@@ -57,4 +57,9 @@ class OptionDataService(
         repository.deleteAllByMenuId(menuId)
     }
 
+    @Transactional
+    fun deleteAllBy(menuIds: List<Long>) {
+        repository.deleteAllByMenuIdIn(menuIds)
+    }
+
 }

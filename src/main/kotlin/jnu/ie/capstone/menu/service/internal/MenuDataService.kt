@@ -1,6 +1,5 @@
 package jnu.ie.capstone.menu.service.internal
 
-import io.lettuce.core.ClientListArgs.Builder.ids
 import jnu.ie.capstone.menu.model.entity.Menu
 import jnu.ie.capstone.menu.repository.MenuRepository
 import org.springframework.data.domain.Page
@@ -41,6 +40,11 @@ class MenuDataService(
     @Transactional
     fun deleteBy(id: Long) {
         repository.deleteById(id)
+    }
+
+    @Transactional
+    fun deleteByStoreId(storeId: Long) {
+        repository.deleteByStoreId(storeId)
     }
 
 }

@@ -39,4 +39,8 @@ public class Store extends BaseEntity {
         this.name = name;
     }
 
+    public void updateName(StoreName name) {
+        this.name = name;
+    }
+
 }

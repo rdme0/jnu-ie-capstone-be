@@ -23,6 +23,7 @@ enum class ErrorCode(
     BAD_DATA_MEANING(Domain.COMMON, HttpStatus.UNPROCESSABLE_ENTITY, 1, "%s"),
 
     NO_SUCH_STORE(Domain.STORE, HttpStatus.NOT_FOUND, 1, "해당 스토어는 없는 스토어 입니다."),
+    YOU_ARE_NOT_STORE_OWNER(Domain.STORE, HttpStatus.FORBIDDEN, 1, "당신은 스토어 주인이 아닙니다."),
 
     NO_SUCH_MENU(Domain.MENU, HttpStatus.NOT_FOUND, 1, "해당 메뉴는 없는 메뉴 입니다."),
     NO_SUCH_OPTION(Domain.MENU, HttpStatus.NOT_FOUND, 2, "해당 옵션은 없는 옵션 입니다."),

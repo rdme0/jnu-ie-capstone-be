@@ -1,7 +1,9 @@
 package jnu.ie.capstone.common.dto.response
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import jnu.ie.capstone.common.exception.enums.ErrorCode
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class CommonResponse(
     val isSuccess: Boolean,
     val message: String,
