@@ -1,6 +1,5 @@
 package jnu.ie.capstone.session.handler
 
-import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
 import jnu.ie.capstone.common.websocket.util.WebSocketReplier
 import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
@@ -156,16 +155,21 @@ class KioskAiSessionHandler(
     }
 
     private fun replyVoiceChunk(session: WebSocketSession): suspend (ByteArray) -> Unit =
-        { chunk ->
+        suspend@{ chunk ->
             val replier = session.attributes[REPLIER_KEY] as? WebSocketReplier
 
-            val result: Result<Unit> = replier
-                ?.send(BinaryMessage(chunk))
-                ?: Result.failure(
-                    InternalServerException(IllegalStateException("replier가 세션에 없음 -> ${session.id}"))
-                )
+            val scope = session.attributes[SESSION_SCOPE_KEY] as? CoroutineScope
 
-            if (result.isFailure)
-                logger.warn(result.exceptionOrNull()) { "메세지 전송 실패 -> ${session.id}" }
+            if (replier == null || scope == null) {
+                logger.warn { "Replier or Scope not found for session ${session.id}" }
+                return@suspend
+            }
+
+            scope.launch {
+                val result: Result<Unit> = replier.send(BinaryMessage(chunk))
+
+                if (result.isFailure)
+                    logger.warn(result.exceptionOrNull()) { "메세지 전송 실패 -> ${session.id}" }
+            }
         }
 }
