@@ -114,25 +114,23 @@ class KioskSessionService(
         storeId: Long,
         ownerInfo: MemberInfo,
         shoppingCart: ShoppingCartDTO
-    ): Flow<Text> = coroutineScope {
-        when (nowState) {
-            MENU_SELECTION -> {
-                sttService
-                    .stt(sharedVoiceStream, rtzrReadySignal)
-                    .onEach { logger.debug { "rtzr stt -> ${it.alternatives.first().text}" } }
-                    .filter { it.final }
-                    .map { it.alternatives.first().text }
-                    .filter { it.isNotBlank() }
-                    .map { menuService.getMenuRelevant(text = it, storeId, ownerInfo) }
-                    .map { Text(MenuSelectionContext(menus = it, shoppingCart = shoppingCart)) }
-            }
-
-            CART_CONFIRMATION -> flowOf(Text(CartConfirmationContext(shoppingCart = shoppingCart)))
-
-            PAYMENT_CONFIRMATION -> flowOf(Text(PaymentConfirmationContext(shoppingCart = shoppingCart)))
-
-            else -> flowOf(Text(NoContext))
+    ): Flow<Text> = when (nowState) {
+        MENU_SELECTION -> {
+            sttService
+                .stt(sharedVoiceStream, rtzrReadySignal)
+                .onEach { logger.debug { "rtzr stt -> ${it.alternatives.first().text}" } }
+                .filter { it.final }
+                .map { it.alternatives.first().text }
+                .filter { it.isNotBlank() }
+                .map { menuService.getMenuRelevant(text = it, storeId, ownerInfo) }
+                .map { Text(MenuSelectionContext(menus = it, shoppingCart = shoppingCart)) }
         }
+
+        CART_CONFIRMATION -> flowOf(Text(CartConfirmationContext(shoppingCart = shoppingCart)))
+
+        PAYMENT_CONFIRMATION -> flowOf(Text(PaymentConfirmationContext(shoppingCart = shoppingCart)))
+
+        else -> flowOf(Text(NoContext))
     }
 
     private suspend fun handleGeminiOutput(
