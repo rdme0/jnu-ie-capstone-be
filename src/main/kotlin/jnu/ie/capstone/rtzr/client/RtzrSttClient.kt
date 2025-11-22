@@ -5,11 +5,9 @@ import jnu.ie.capstone.rtzr.dto.client.response.RtzrAuthResponse
 import jnu.ie.capstone.rtzr.dto.client.response.RtzrSttResponse
 import jnu.ie.capstone.rtzr.factory.RtzrSttWebsocketHandlerFactory
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactive.awaitSingle
@@ -34,7 +32,6 @@ class RtzrSttClient(
 ) {
 
     private companion object {
-        const val BUFFER_SIZE = 512
         val END_OF_STREAM = TextMessage("EOS")
         val logger = KotlinLogging.logger {}
         val restClient = WebClient.builder().build()
@@ -54,12 +51,9 @@ class RtzrSttClient(
     suspend fun stt(
         voiceStream: Flow<ByteArray>,
         accessToken: String,
-        scope: CoroutineScope,
         rtzrReadySignal: CompletableDeferred<Unit>
-    ): Flow<RtzrSttResponse> {
-        val channel = getChannel()
-
-        val handler = handlerFactory.createHandler(channel)
+    ): Flow<RtzrSttResponse> = channelFlow {
+        val handler = handlerFactory.createHandler(channel = this)
 
         val session = wsClient.execute(
             handler,
@@ -70,7 +64,7 @@ class RtzrSttClient(
         rtzrReadySignal.complete(Unit)
         logger.info { "RTZR STT WebSocket 연결 수립 및 신호 전송 완료" }
 
-        scope.launch {
+        launch {
             try {
                 voiceStream.collect { chunk ->
                     session.sendMessage(BinaryMessage(chunk))
@@ -81,11 +75,10 @@ class RtzrSttClient(
                 session.close()
             }
         }
-        return channel.consumeAsFlow()
-    }
-
-    private fun getChannel(): Channel<RtzrSttResponse> {
-        return Channel(capacity = BUFFER_SIZE, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        awaitClose {
+            logger.info { "RtzrSttClient 종료 (awaitClose)" }
+            session.close()
+        }
     }
 
     private fun getAuthBody(): LinkedMultiValueMap<String, String> {

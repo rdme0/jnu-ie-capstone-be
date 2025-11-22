@@ -4,7 +4,8 @@ import jnu.ie.capstone.gemini.client.GeminiLiveClient
 import jnu.ie.capstone.gemini.config.PromptConfig
 import jnu.ie.capstone.gemini.constant.enums.GeminiFunctionSignature.*
 import jnu.ie.capstone.gemini.dto.client.internal.Context.*
-import jnu.ie.capstone.gemini.dto.client.request.GeminiInput.*
+import jnu.ie.capstone.gemini.dto.client.request.GeminiInput.Audio
+import jnu.ie.capstone.gemini.dto.client.request.GeminiInput.Text
 import jnu.ie.capstone.gemini.dto.client.response.GeminiFunctionParams.AddItems
 import jnu.ie.capstone.gemini.dto.client.response.GeminiFunctionParams.RemoveItems
 import jnu.ie.capstone.gemini.dto.client.response.GeminiOutput
@@ -26,9 +27,8 @@ import jnu.ie.capstone.session.event.StateChangeEvent
 import jnu.ie.capstone.session.service.internal.KioskShoppingCartService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -51,12 +51,12 @@ class KioskSessionService(
     private val shoppingCartService: KioskShoppingCartService,
     private val eventPublisher: ApplicationEventPublisher
 ) {
-    companion object {
-        private val logger = KotlinLogging.logger {}
-    }
+    private companion object {
+        const val SHOPPING_CART_KEY = "shoppingCart"
 
-    private val scopeForContext = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val stateMachineLocks = ConcurrentHashMap<String, Mutex>()
+        val logger = KotlinLogging.logger {}
+        val stateMachineLocks = ConcurrentHashMap<String, Mutex>()
+    }
 
     suspend fun processVoiceChunk(
         rtzrReadySignal: CompletableDeferred<Unit>,
@@ -66,11 +66,12 @@ class KioskSessionService(
         stateMachine: StateMachine<SessionState, SessionEvent>,
         session: WebSocketSession,
         onVoiceChunk: suspend (ByteArray) -> Unit
-    ) {
+    ) = coroutineScope {
+        val currentScope: CoroutineScope = this
         val sharedVoiceStream = voiceStream
             .buffer(capacity = 128, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-            .shareIn(scopeForContext, SharingStarted.Lazily)
-        val shoppingCart = session.attributes["shoppingCart"] as ShoppingCartDTO
+            .shareIn(scope = currentScope, started = SharingStarted.Lazily)
+        val shoppingCart = session.attributes[SHOPPING_CART_KEY] as ShoppingCartDTO
         val nowState = stateMachine.state.id
 
         val voiceFastInput: Flow<Audio> = sharedVoiceStream.map { Audio(it) }
@@ -113,23 +114,25 @@ class KioskSessionService(
         storeId: Long,
         ownerInfo: MemberInfo,
         shoppingCart: ShoppingCartDTO
-    ): Flow<Text> = when (nowState) {
-        MENU_SELECTION -> {
-            sttService
-                .stt(sharedVoiceStream, scopeForContext, rtzrReadySignal)
-                .onEach { logger.debug { "rtzr stt -> ${it.alternatives.first().text}" } }
-                .filter { it.final }
-                .map { it.alternatives.first().text }
-                .filter { it.isNotBlank() }
-                .map { menuService.getMenuRelevant(text = it, storeId, ownerInfo) }
-                .map { Text(MenuSelectionContext(menus = it, shoppingCart = shoppingCart)) }
+    ): Flow<Text> = coroutineScope {
+        when (nowState) {
+            MENU_SELECTION -> {
+                sttService
+                    .stt(sharedVoiceStream, rtzrReadySignal)
+                    .onEach { logger.debug { "rtzr stt -> ${it.alternatives.first().text}" } }
+                    .filter { it.final }
+                    .map { it.alternatives.first().text }
+                    .filter { it.isNotBlank() }
+                    .map { menuService.getMenuRelevant(text = it, storeId, ownerInfo) }
+                    .map { Text(MenuSelectionContext(menus = it, shoppingCart = shoppingCart)) }
+            }
+
+            CART_CONFIRMATION -> flowOf(Text(CartConfirmationContext(shoppingCart = shoppingCart)))
+
+            PAYMENT_CONFIRMATION -> flowOf(Text(PaymentConfirmationContext(shoppingCart = shoppingCart)))
+
+            else -> flowOf(Text(NoContext))
         }
-
-        CART_CONFIRMATION -> flowOf(Text(CartConfirmationContext(shoppingCart = shoppingCart)))
-
-        PAYMENT_CONFIRMATION -> flowOf(Text(PaymentConfirmationContext(shoppingCart = shoppingCart)))
-
-        else -> flowOf(Text(NoContext))
     }
 
     private suspend fun handleGeminiOutput(

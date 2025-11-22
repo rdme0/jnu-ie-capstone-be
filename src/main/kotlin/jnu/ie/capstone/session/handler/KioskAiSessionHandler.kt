@@ -55,11 +55,11 @@ class KioskAiSessionHandler(
 
         logger.info { "${session.id} statemachine 생성 완료. 현재 상태 -> ${stateMachine.state.id}" }
 
-        val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val webSocketSessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        session.attributes[SESSION_SCOPE_KEY] = sessionScope
+        session.attributes[SESSION_SCOPE_KEY] = webSocketSessionScope
 
-        val replier = WebSocketReplier(session, sessionScope)
+        val replier = WebSocketReplier(session, webSocketSessionScope)
 
         session.attributes[REPLIER_KEY] = replier
 
@@ -90,7 +90,7 @@ class KioskAiSessionHandler(
 
         logger.info { "쇼핑카트 생성 완료" }
 
-        sessionScope.launch {
+        webSocketSessionScope.launch {
             val rtzrReadySignal = CompletableDeferred<Unit>()
 
             launch {
