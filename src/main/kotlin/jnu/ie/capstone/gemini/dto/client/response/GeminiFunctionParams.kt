@@ -3,6 +3,8 @@ package jnu.ie.capstone.gemini.dto.client.response
 sealed class GeminiFunctionParams {
     object NoParams: GeminiFunctionParams()
 
+    data class SearchMenuRAG(val searchText: String) : GeminiFunctionParams()
+
     data class AddItems(
         val orderItems: List<OrderItemDTO>
     ) : GeminiFunctionParams()

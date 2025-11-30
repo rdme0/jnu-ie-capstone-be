@@ -4,37 +4,36 @@ import jnu.ie.capstone.gemini.client.GeminiLiveClient
 import jnu.ie.capstone.gemini.config.PromptConfig
 import jnu.ie.capstone.gemini.constant.enums.GeminiFunctionSignature.*
 import jnu.ie.capstone.gemini.dto.client.internal.Context.*
+import jnu.ie.capstone.gemini.dto.client.request.GeminiInput
 import jnu.ie.capstone.gemini.dto.client.request.GeminiInput.Audio
 import jnu.ie.capstone.gemini.dto.client.request.GeminiInput.Text
-import jnu.ie.capstone.gemini.dto.client.response.GeminiFunctionParams.AddItems
-import jnu.ie.capstone.gemini.dto.client.response.GeminiFunctionParams.RemoveItems
+import jnu.ie.capstone.gemini.dto.client.response.GeminiFunctionParams.*
 import jnu.ie.capstone.gemini.dto.client.response.GeminiOutput
 import jnu.ie.capstone.gemini.dto.client.response.GeminiOutput.*
 import jnu.ie.capstone.member.dto.MemberInfo
+import jnu.ie.capstone.menu.dto.internal.MenuInternalDTO
 import jnu.ie.capstone.menu.service.MenuCoordinateService
-import jnu.ie.capstone.rtzr.service.RtzrSttService
 import jnu.ie.capstone.session.dto.internal.OutputTextChunkDTO
 import jnu.ie.capstone.session.dto.internal.OutputTextResultDTO
 import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
 import jnu.ie.capstone.session.dto.internal.StateChangeDTO
+import jnu.ie.capstone.session.dto.response.WebSocketBinaryResponse
+import jnu.ie.capstone.session.dto.response.WebSocketResponse
+import jnu.ie.capstone.session.dto.response.WebSocketTextResponse
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
 import jnu.ie.capstone.session.enums.SessionState.*
-import jnu.ie.capstone.session.event.EndOfGeminiTurnEvent
-import jnu.ie.capstone.session.event.OutputTextEvent
-import jnu.ie.capstone.session.event.ShoppingCartUpdatedEvent
-import jnu.ie.capstone.session.event.StateChangeEvent
 import jnu.ie.capstone.session.service.internal.KioskShoppingCartService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactive.awaitFirstOrNull
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import mu.KotlinLogging
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.messaging.support.MessageBuilder
 import org.springframework.statemachine.StateMachine
 import org.springframework.stereotype.Service
@@ -46,59 +45,59 @@ import java.util.concurrent.ConcurrentHashMap
 class KioskSessionService(
     private val liveClient: GeminiLiveClient,
     private val menuService: MenuCoordinateService,
-    private val sttService: RtzrSttService,
     private val promptConfig: PromptConfig,
-    private val shoppingCartService: KioskShoppingCartService,
-    private val eventPublisher: ApplicationEventPublisher
+    private val shoppingCartService: KioskShoppingCartService
 ) {
     private companion object {
         const val SHOPPING_CART_KEY = "shoppingCart"
+        const val OK = "ok"
 
         val logger = KotlinLogging.logger {}
         val stateMachineLocks = ConcurrentHashMap<String, Mutex>()
     }
 
     suspend fun processVoiceChunk(
-        rtzrReadySignal: CompletableDeferred<Unit>,
+        geminiReadySignal: CompletableDeferred<Unit>,
         voiceStream: Flow<ByteArray>,
         storeId: Long,
         ownerInfo: MemberInfo,
         stateMachine: StateMachine<SessionState, SessionEvent>,
         session: WebSocketSession,
-        onVoiceChunk: suspend (ByteArray) -> Unit
-    ) = coroutineScope {
+        onReply: suspend (WebSocketResponse) -> Unit
+    ) = supervisorScope {
         val currentScope: CoroutineScope = this
+
         val sharedVoiceStream = voiceStream
             .buffer(capacity = 128, onBufferOverflow = BufferOverflow.DROP_OLDEST)
             .shareIn(scope = currentScope, started = SharingStarted.Lazily)
+
         val shoppingCart = session.attributes[SHOPPING_CART_KEY] as ShoppingCartDTO
+
         val nowState = stateMachine.state.id
 
         val voiceFastInput: Flow<Audio> = sharedVoiceStream.map { Audio(it) }
-        val contextSlowInput: Flow<Text> = handleContextByState(
-            rtzrReadySignal,
-            nowState,
-            sharedVoiceStream,
-            storeId,
-            ownerInfo,
-            shoppingCart
-        ).onEach { logger.info { "gemini slow input -> $it" } }
 
-        val mergedInput = merge(voiceFastInput, contextSlowInput)
+        val contextSlowInput: Flow<Text> = handleContextByState(nowState, shoppingCart)
+            .onEach { logger.info { "gemini slow input -> $it" } }
+
+        val toolResponseChannel = Channel<GeminiInput.ToolResponse>(Channel.BUFFERED)
+
+        val toolResponseInput = toolResponseChannel.receiveAsFlow()
+
+        val mergedInput = merge(voiceFastInput, contextSlowInput, toolResponseInput)
             .onEach { logger.debug { "gemini merged input -> $it" } }
 
         liveClient
-            .getLiveResponse(mergedInput, promptConfig.kiosk)
+            .getLiveResponse(geminiReadySignal, mergedInput, promptConfig.kiosk)
             .collect { output ->
                 handleGeminiOutput(
                     output,
-                    session,
                     stateMachine,
                     storeId,
                     ownerInfo,
                     shoppingCart,
-                    onVoiceChunk
-                )
+                    toolResponseChannel
+                ) { message -> onReply(message) }
             }
     }
 
@@ -108,23 +107,10 @@ class KioskSessionService(
     }
 
     private suspend fun handleContextByState(
-        rtzrReadySignal: CompletableDeferred<Unit>,
         nowState: SessionState,
-        sharedVoiceStream: SharedFlow<ByteArray>,
-        storeId: Long,
-        ownerInfo: MemberInfo,
         shoppingCart: ShoppingCartDTO
     ): Flow<Text> = when (nowState) {
-        MENU_SELECTION -> {
-            sttService
-                .stt(sharedVoiceStream, rtzrReadySignal)
-                .onEach { logger.debug { "rtzr stt -> ${it.alternatives.first().text}" } }
-                .filter { it.final }
-                .map { it.alternatives.first().text }
-                .filter { it.isNotBlank() }
-                .map { menuService.getMenuRelevant(text = it, storeId, ownerInfo) }
-                .map { Text(MenuSelectionContext(menus = it, shoppingCart = shoppingCart)) }
-        }
+        MENU_SELECTION -> flowOf(Text(MenuSelectionContext(shoppingCart = shoppingCart)))
 
         CART_CONFIRMATION -> flowOf(Text(CartConfirmationContext(shoppingCart = shoppingCart)))
 
@@ -135,12 +121,12 @@ class KioskSessionService(
 
     private suspend fun handleGeminiOutput(
         output: GeminiOutput,
-        session: WebSocketSession,
         stateMachine: StateMachine<SessionState, SessionEvent>,
         storeId: Long,
         ownerInfo: MemberInfo,
         shoppingCart: ShoppingCartDTO,
-        onVoiceChunk: suspend (ByteArray) -> Unit
+        toolResponseChannel: Channel<GeminiInput.ToolResponse>,
+        onReply: suspend (WebSocketResponse) -> Unit
     ) {
         when (output) {
             is InputSTT -> {
@@ -151,7 +137,8 @@ class KioskSessionService(
                 logger.info { "gemini output stt -> ${output.text}" }
 
                 val content = OutputTextChunkDTO(output.text)
-                eventPublisher.publishEvent(OutputTextEvent(this, session.id, content))
+
+                onReply(WebSocketTextResponse.fromOutputText(content))
             }
 
             is FunctionCall -> {
@@ -160,26 +147,42 @@ class KioskSessionService(
                 logger.info { "gemini output params -> ${output.params}" }
 
                 output.signature.toSessionEvent()
-                    ?.let { handleSessionEvent(it, stateMachine) }
+                    ?.let { sessionEvent ->
+                        handleSessionEvent(
+                            functionCall = output,
+                            event = sessionEvent,
+                            stateMachine = stateMachine,
+                            toolResponseChannel = toolResponseChannel,
+                        ) { textResponse -> onReply(textResponse) }
+                    }
                     ?: run {
-                        handleFunctionCall(output, storeId, ownerInfo, shoppingCart, session.id)
+                        handleGeneralFunctionCall(
+                            output,
+                            storeId,
+                            ownerInfo,
+                            shoppingCart,
+                            toolResponseChannel,
+                        ) { textResponse -> onReply(textResponse) }
                     }
             }
 
             is VoiceStream -> {
-                onVoiceChunk(output.chunk)
+                onReply(WebSocketBinaryResponse(output.chunk))
             }
 
             is EndOfGeminiTurn -> {
                 val content = OutputTextResultDTO(output.finalOutputSTT)
-                eventPublisher.publishEvent(EndOfGeminiTurnEvent(this, session.id, content))
+                onReply(WebSocketTextResponse.fromEndOfGeminiTurn(content))
             }
         }
     }
 
     private suspend fun handleSessionEvent(
+        functionCall: FunctionCall,
         event: SessionEvent,
-        stateMachine: StateMachine<SessionState, SessionEvent>
+        stateMachine: StateMachine<SessionState, SessionEvent>,
+        toolResponseChannel: Channel<GeminiInput.ToolResponse>,
+        onReply: suspend (WebSocketTextResponse) -> Unit
     ) {
         val sessionId = stateMachine.id
         val mutex = stateMachineLocks.computeIfAbsent(sessionId) { Mutex() }
@@ -204,31 +207,45 @@ class KioskSessionService(
 
                 val content = StateChangeDTO(from = oldState, to = newState, because = event)
 
-                val stateChangedEvent = StateChangeEvent(
-                    this@KioskSessionService,
-                    sessionId,
-                    content
-                )
-
-                eventPublisher.publishEvent(stateChangedEvent)
-
+                onReply(WebSocketTextResponse.fromStateChange(content))
             } catch (e: Exception) {
                 logger.error(e) { "State machine error processing event $event: ${e.message}" }
+            } finally {
+                sendOKToGemini(functionCall, toolResponseChannel)
             }
         }
     }
 
-    private fun handleFunctionCall(
+    private suspend fun handleGeneralFunctionCall(
         output: FunctionCall,
         storeId: Long,
         ownerInfo: MemberInfo,
         shoppingCart: ShoppingCartDTO,
-        sessionId: String
+        toolResponseChannel: Channel<GeminiInput.ToolResponse>,
+        onReply: suspend (WebSocketTextResponse) -> Unit
     ) {
         logger.info { "쇼핑카트 before -> $shoppingCart" }
         var isCartUpdated = false
 
         when (output.signature) {
+            SEARCH_MENU_RAG -> {
+                val params = output.params as SearchMenuRAG
+
+                val relevantMenus: List<MenuInternalDTO> = menuService.getMenuRelevant(
+                    text = params.searchText,
+                    storeId = storeId,
+                    ownerInfo = ownerInfo
+                )
+
+                toolResponseChannel.send(
+                    GeminiInput.ToolResponse(
+                        id = output.id,
+                        functionName = output.signature.name,
+                        result = relevantMenus.joinToString("\n\n" + "-".repeat(20) + "\n\n") { it.toString() }
+                    )
+                )
+            }
+
             ADD_MENUS_OR_OPTIONS -> {
                 val params = output.params as AddItems
 
@@ -238,6 +255,8 @@ class KioskSessionService(
                     shoppingCart = shoppingCart,
                     addItems = params
                 )
+
+                sendOKToGemini(output, toolResponseChannel)
             }
 
             REMOVE_MENUS_OR_OPTIONS -> {
@@ -247,23 +266,36 @@ class KioskSessionService(
                     shoppingCart = shoppingCart,
                     removeItems = params
                 )
+
+                sendOKToGemini(output, toolResponseChannel)
             }
 
-            DO_NOTHING -> {}
+            DO_NOTHING -> {
+                sendOKToGemini(output, toolResponseChannel)
+            }
 
-            else -> {}
+            else -> {
+                sendOKToGemini(output, toolResponseChannel)
+            }
         }
 
         if (isCartUpdated) {
-            val event = ShoppingCartUpdatedEvent(
-                source = this,
-                sessionId = sessionId,
-                content = shoppingCart.toResponseDTO()
-            )
-            eventPublisher.publishEvent(event)
+            onReply(WebSocketTextResponse.fromUpdateShoppingCart(shoppingCart.toResponseDTO()))
         }
 
         logger.info { "쇼핑카트 after -> $shoppingCart" }
     }
 
+    private suspend fun sendOKToGemini(
+        functionCall: FunctionCall,
+        toolResponseChannel: Channel<GeminiInput.ToolResponse>
+    ) {
+        toolResponseChannel.send(
+            GeminiInput.ToolResponse(
+                id = functionCall.id,
+                functionName = functionCall.signature.name,
+                result = OK
+            )
+        )
+    }
 }

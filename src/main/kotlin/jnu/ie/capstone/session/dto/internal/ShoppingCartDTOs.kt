@@ -1,7 +1,7 @@
 package jnu.ie.capstone.session.dto.internal
 
 import jnu.ie.capstone.common.util.TimeUtil
-import jnu.ie.capstone.session.dto.response.SessionResponseContent
+import jnu.ie.capstone.session.dto.response.WebSocketTextResponseContent
 import java.time.ZonedDateTime
 
 data class ShoppingCartDTO(
@@ -24,7 +24,7 @@ data class ShoppingCartResponseDTO(
     val menus: List<ShoppingCartMenuDTO>,
     val menuCount: Int,
     val totalPrice: Long
-) : SessionResponseContent
+) : WebSocketTextResponseContent
 
 data class ShoppingCartMenuDTO(
     val id: Long,

@@ -7,10 +7,12 @@ sealed class GeminiOutput {
     data class OutputSTT(val text: String) : GeminiOutput()
 
     data class FunctionCall(
+        val id: String,
         val signature: GeminiFunctionSignature,
         val params: GeminiFunctionParams
     ) : GeminiOutput()
 
+    @Suppress("ArrayInDataClass")
     data class VoiceStream(val chunk: ByteArray) : GeminiOutput()
 
     data class EndOfGeminiTurn(

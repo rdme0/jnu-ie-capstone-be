@@ -7,6 +7,7 @@ import kotlin.reflect.KClass
 enum class GeminiFunctionSignature(
     val paramsType: KClass<out GeminiFunctionParams>
 ) {
+    SEARCH_MENU_RAG(GeminiFunctionParams.SearchMenuRAG::class),
 
     ADD_MENUS_OR_OPTIONS(GeminiFunctionParams.AddItems::class),
     REMOVE_MENUS_OR_OPTIONS(GeminiFunctionParams.RemoveItems::class),

@@ -6,6 +6,39 @@ import com.google.genai.types.Schema
 import com.google.genai.types.Type
 
 object GeminiSchema {
+    val SEARCH_MENU_RAG_PARAMS_SCHEMA: Schema = Schema.builder()
+        .type(Type.Known.OBJECT)
+        .properties(
+            ImmutableMap.of(
+                "searchText",
+                Schema.builder().type(Type.Known.STRING).build()
+            )
+        )
+        .required(ImmutableList.of("searchText"))
+        .build()
+
+    val SEARCH_MENU_RAG_RESPONSE_SCHEMA: Schema = Schema.builder()
+        .type(Type.Known.OBJECT)
+        .properties(
+            ImmutableMap.of(
+                "result",
+                Schema.builder().type(Type.Known.STRING).build()
+            )
+        )
+        .description("MENU를 RAG SEARCH 한 결과물이다. 앞에 있는 메뉴일 수록 유사도가 큰 메뉴이다.")
+        .build()
+
+    val STATE_MACHINE_RESPONSE_SCHEMA: Schema = Schema.builder()
+        .type(Type.Known.OBJECT)
+        .properties(
+            ImmutableMap.of(
+                "result",
+                Schema.builder().type(Type.Known.STRING).build()
+            )
+        )
+        .description("상태 변경이나 장바구니 수정 함수에 대한 응답이다. (value는 ok로 고정이다)")
+        .build()
+
     val ADD_MENUS_OR_OPTIONS_SCHEMA: Schema = Schema.builder()
         .type(Type.Known.OBJECT)
         .properties(

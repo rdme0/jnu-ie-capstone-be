@@ -1,18 +1,19 @@
 package jnu.ie.capstone.session.handler
 
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
+import jnu.ie.capstone.common.websocket.factory.WebSocketReplierFactory
 import jnu.ie.capstone.common.websocket.util.WebSocketReplier
 import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
+import jnu.ie.capstone.session.dto.response.WebSocketResponse
+import jnu.ie.capstone.session.dto.response.WebSocketTextResponse
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
-import jnu.ie.capstone.session.event.ServerReadyEvent
 import jnu.ie.capstone.session.registry.WebSocketSessionRegistry
 import jnu.ie.capstone.session.service.KioskSessionService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import mu.KotlinLogging
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.statemachine.StateMachine
 import org.springframework.statemachine.config.StateMachineFactory
@@ -28,8 +29,8 @@ import kotlin.coroutines.cancellation.CancellationException
 class KioskAiSessionHandler(
     private val kioskSessionService: KioskSessionService,
     private val stateMachineFactory: StateMachineFactory<SessionState, SessionEvent>,
-    private val sessionRegistry: WebSocketSessionRegistry,
-    private val eventPublisher: ApplicationEventPublisher
+    private val replierFactory: WebSocketReplierFactory,
+    private val sessionRegistry: WebSocketSessionRegistry
 ) : BinaryWebSocketHandler() {
 
     private companion object {
@@ -59,7 +60,7 @@ class KioskAiSessionHandler(
 
         session.attributes[SESSION_SCOPE_KEY] = webSocketSessionScope
 
-        val replier = WebSocketReplier(session, webSocketSessionScope)
+        val replier : WebSocketReplier = replierFactory.create(session, webSocketSessionScope)
 
         session.attributes[REPLIER_KEY] = replier
 
@@ -70,7 +71,8 @@ class KioskAiSessionHandler(
 
         session.attributes[CLIENT_VOICE_STREAM_KEY] = clientVoiceStream
 
-        val authentication = session.attributes[PRINCIPAL_KEY] as? UsernamePasswordAuthenticationToken
+        val authentication =
+            session.attributes[PRINCIPAL_KEY] as? UsernamePasswordAuthenticationToken
 
         val userDetails = authentication?.principal as? KioskUserDetails
             ?: run {
@@ -91,19 +93,18 @@ class KioskAiSessionHandler(
         logger.info { "쇼핑카트 생성 완료" }
 
         webSocketSessionScope.launch {
-            val rtzrReadySignal = CompletableDeferred<Unit>()
+            val geminiReadySignal = CompletableDeferred<Unit>()
 
             launch {
                 try {
                     kioskSessionService.processVoiceChunk(
-                        rtzrReadySignal,
+                        geminiReadySignal,
                         clientVoiceStream,
                         storeId,
                         userDetails.memberInfo,
                         stateMachine,
-                        session,
-                        onVoiceChunk = replyVoiceChunk(session)
-                    )
+                        session
+                    ) { message -> reply(session)(message) }
                 } catch (_: CancellationException) {
                     logger.info { "세션 ${session.id} 처리가 정상적으로 취소되었습니다." }
                 } catch (e: Exception) {
@@ -111,10 +112,11 @@ class KioskAiSessionHandler(
                 }
             }
 
-            rtzrReadySignal.await()
+            geminiReadySignal.await()
 
-            eventPublisher.publishEvent(ServerReadyEvent(source = this, sessionId = session.id))
-            logger.info { "클라이언트(${session.id})에게 준비 완료 신호 전송 (STT 연결 완료 후)" }
+            replier.send(WebSocketTextResponse.fromServerReady())
+
+            logger.info { "클라이언트(${session.id})에게 준비 완료 신호 전송" }
         }
     }
 
@@ -154,8 +156,8 @@ class KioskAiSessionHandler(
         return stateMachine
     }
 
-    private fun replyVoiceChunk(session: WebSocketSession): suspend (ByteArray) -> Unit =
-        suspend@{ chunk ->
+    private fun reply(session: WebSocketSession): suspend (WebSocketResponse) -> Unit =
+        suspend@{ message ->
             val replier = session.attributes[REPLIER_KEY] as? WebSocketReplier
 
             val scope = session.attributes[SESSION_SCOPE_KEY] as? CoroutineScope
@@ -165,11 +167,9 @@ class KioskAiSessionHandler(
                 return@suspend
             }
 
-            scope.launch {
-                val result: Result<Unit> = replier.send(BinaryMessage(chunk))
+            val result: Result<Unit> = replier.send(message)
 
-                if (result.isFailure)
-                    logger.warn(result.exceptionOrNull()) { "메세지 전송 실패 -> ${session.id}" }
-            }
+            if (result.isFailure)
+                logger.warn(result.exceptionOrNull()) { "메세지 전송 실패 -> ${session.id}" }
         }
 }

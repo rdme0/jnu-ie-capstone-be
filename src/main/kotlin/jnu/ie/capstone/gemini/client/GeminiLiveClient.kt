@@ -14,6 +14,7 @@ import jnu.ie.capstone.gemini.dto.client.internal.Context
 import jnu.ie.capstone.gemini.dto.client.request.GeminiInput
 import jnu.ie.capstone.gemini.dto.client.response.GeminiFunctionParams
 import jnu.ie.capstone.gemini.dto.client.response.GeminiOutput
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -31,12 +32,17 @@ class GeminiLiveClient(
 ) {
 
     companion object {
+        private const val API_VERSION = "v1alpha"
         private val logger = KotlinLogging.logger {}
     }
 
-    private val client = Client.builder().apiKey(config.apiKey).build()
+    private val client = Client.builder()
+        .apiKey(config.apiKey)
+        .httpOptions(HttpOptions.builder().apiVersion(API_VERSION).build())
+        .build()
 
     suspend fun getLiveResponse(
+        geminiReadySignal: CompletableDeferred<Unit>,
         inputData: Flow<GeminiInput>,
         prompt: String,
         model: GeminiModel = GeminiModel.GEMINI_2_5_FLASH_NATIVE_AUDIO
@@ -46,6 +52,8 @@ class GeminiLiveClient(
                 val session = client.async.live
                     .connect(model.text, buildLiveConnectConfig(prompt))
                     .await()
+
+                geminiReadySignal.complete(Unit)
 
                 logger.debug { "Gemini Live 세션이 연결되었습니다." }
 
@@ -63,12 +71,16 @@ class GeminiLiveClient(
 
     private fun buildLiveConnectConfig(prompt: String): LiveConnectConfig {
         return LiveConnectConfig.builder()
-            .tools(GeminiFunctionDeclaration.STATEMACHINE_TOOL)
+            .tools(
+                GeminiFunctionDeclaration.RAG_SEARCH_TOOL,
+                GeminiFunctionDeclaration.STATEMACHINE_TOOL
+            )
             .responseModalities(Modality.Known.AUDIO)
             .inputAudioTranscription(AudioTranscriptionConfig.builder().build())
             .outputAudioTranscription(AudioTranscriptionConfig.builder().build())
             .realtimeInputConfig(buildRealTimeInputConfig())
             .systemInstruction(Content.fromParts(Part.fromText(prompt)))
+            .proactivity(ProactivityConfig.builder().proactiveAudio(true).build())
             .speechConfig(
                 SpeechConfig.builder()
                     .languageCode("ko-KR")
@@ -96,13 +108,7 @@ class GeminiLiveClient(
         processOutputSTT(message, outputSTTBuffer)
         processOutputVoiceStream(message)
         processFunctionCall(message)
-
-        val isGeminiTurnComplete = message.serverContent().flatMap { it.turnComplete() }
-            .orElse(false)
-
-        if (isGeminiTurnComplete) {
-            onGeminiTurnComplete(inputSTTBuffer, outputSTTBuffer)
-        }
+        processGenerationComplete(message, outputSTTBuffer, inputSTTBuffer)
     }
 
     private fun ProducerScope<GeminiOutput>.processInputSTT(
@@ -150,8 +156,8 @@ class GeminiLiveClient(
         message: LiveServerMessage
     ) {
         message.toolCall().getOrNull()?.functionCalls()?.ifPresent { call ->
-            call.map { Pair(it.name()?.get(), it.args()?.get()) }
-                .forEach { (name, items) ->
+            call.map { Triple(it.id()?.get(), it.name()?.get(), it.args()?.get()) }
+                .forEach { (id, name, items) ->
 
                     logger.info { "함수 이름 : $name, items : $items" }
 
@@ -173,10 +179,36 @@ class GeminiLiveClient(
                         }
                     }
 
-                    val output = GeminiOutput.FunctionCall(enum, params)
+                    val functionId = id ?: ""
+
+                    val output = GeminiOutput
+                        .FunctionCall(id = functionId, signature = enum, params = params)
 
                     trySend(output)
                 }
+        }
+    }
+
+
+    private fun ProducerScope<GeminiOutput>.processGenerationComplete(
+        message: LiveServerMessage,
+        outputSTTBuffer: StringBuilder,
+        inputSTTBuffer: StringBuilder
+    ) {
+        val isGenerationComplete = message.serverContent()
+            .flatMap { it.generationComplete() }
+            .orElse(false)
+
+        if (isGenerationComplete && outputSTTBuffer.isNotEmpty()) {
+            val finalInputSTT = inputSTTBuffer.toString()
+            val finalOutputSTT = outputSTTBuffer.toString()
+
+            logger.info { "gemini가 대답을 완료했습니다. input STT: [$finalInputSTT], output STT: [$finalOutputSTT]" }
+
+            trySend(GeminiOutput.EndOfGeminiTurn(finalInputSTT, finalOutputSTT))
+
+            inputSTTBuffer.clear()
+            outputSTTBuffer.clear()
         }
     }
 
@@ -185,10 +217,10 @@ class GeminiLiveClient(
         inputData: Flow<GeminiInput>,
         session: AsyncSession
     ) {
-        inputData.collect {
-            when (it) {
+        inputData.collect { input ->
+            when (input) {
                 is GeminiInput.Audio -> {
-                    session.sendRealtimeInput(buildAudioContent(it.chunk))
+                    session.sendRealtimeInput(buildAudioContent(input.chunk))
                         .exceptionally { exception ->
                             logger.error(exception) { "audio chunk 보내는 중 에러 발생 -> ${exception.message}" }
                             return@exceptionally null
@@ -197,11 +229,31 @@ class GeminiLiveClient(
 
                 is GeminiInput.Text -> {
                     session.sendRealtimeInput(
-                        buildTextContent(it.context)
+                        buildTextContent(input.context)
                     ).exceptionally { exception ->
                         logger.error(exception) { "audio chunk 보내는 중 에러 발생 -> ${exception.message}" }
                         return@exceptionally null
                     }.await()
+                }
+
+                is GeminiInput.ToolResponse -> {
+                    logger.info { "Tool Response 전송: ID=${input.id}, Result=${input.result}" }
+
+                    val functionResponse = FunctionResponse.builder()
+                        .id(input.id)
+                        .name(input.functionName)
+                        .response(mapOf("result" to input.result))
+                        .build()
+
+                    val params = LiveSendToolResponseParameters.builder()
+                        .functionResponses(functionResponse)
+                        .build()
+
+                    session.sendToolResponse(params)
+                        .exceptionally { e ->
+                            logger.error(e) { "Tool Response 전송 실패" }
+                            return@exceptionally null
+                        }.await()
                 }
             }
         }
@@ -233,21 +285,5 @@ class GeminiLiveClient(
         return LiveSendRealtimeInputParameters.builder()
             .text(context.toString())
             .build()
-    }
-
-    private fun ProducerScope<GeminiOutput>.onGeminiTurnComplete(
-        inputSTTBuffer: StringBuilder,
-        outputSTTBuffer: StringBuilder
-    ) {
-        val finalInputSTT = inputSTTBuffer.toString()
-        val finalOutputSTT = outputSTTBuffer.toString()
-
-        logger.info { "gemini가 대답을 완료했습니다. input STT: [$finalInputSTT], output STT: [$finalOutputSTT]" }
-
-        if (finalInputSTT.isNotEmpty() || finalOutputSTT.isNotEmpty())
-            trySend(GeminiOutput.EndOfGeminiTurn(finalInputSTT, finalOutputSTT))
-
-        inputSTTBuffer.clear()
-        outputSTTBuffer.clear()
     }
 }
