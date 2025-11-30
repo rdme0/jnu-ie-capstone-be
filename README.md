@@ -66,7 +66,7 @@ graph TD
 | --- | --- | --- | --- |
 | **Language** | **Kotlin** | 2.2.0 | Null Safety와 Coroutines를 통한 비동기 처리 효율성 극대화 |
 | **Framework** | **Spring Boot** | 3.5.4 | 최신 스프링 생태계 활용 및 안정적인 의존성 관리 |
-| **AI Model** | **Google Gemini** | 1.5 Flash | 멀티모달 처리 능력과 빠른 응답 속도 (via `google-genai`) |
+| **AI Model** | **Google Gemini** | gemini-2.5-flash-native-audio-preview-09-2025 | 멀티모달 처리 능력과 빠른 응답 속도 (via `google-genai`) |
 | **Async** | **Kotlin Coroutines** | - | Non-blocking I/O 및 경량 스레드 기반의 동시성 제어 |
 | **Protocol** | **WebSocket** | - | 실시간 양방향 음성/데이터 통신 |
 | **State Mgmt** | **Spring State Machine** | 4.0.1 | 복잡한 대화 시나리오의 상태 전이 제어 및 예외 상황 방지 |
