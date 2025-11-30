@@ -1,13 +1,20 @@
 package jnu.ie.capstone.common.websocket.util
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import jnu.ie.capstone.session.dto.response.WebSocketBinaryResponse
+import jnu.ie.capstone.session.dto.response.WebSocketResponse
+import jnu.ie.capstone.session.dto.response.WebSocketTextResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
+import org.springframework.web.socket.BinaryMessage
+import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketMessage
 import org.springframework.web.socket.WebSocketSession
 
 class WebSocketReplier(
+    private val mapper: ObjectMapper,
     private val session: WebSocketSession,
     scope: CoroutineScope,
     channelCapacity: Int = 256
@@ -32,9 +39,23 @@ class WebSocketReplier(
         }
     }
 
-    suspend fun send(message: WebSocketMessage<*>): Result<Unit> {
+    suspend fun send(message: WebSocketResponse): Result<Unit> {
         return runCatching {
-            queue.send(message)
+            when (message) {
+                is WebSocketBinaryResponse -> {
+                    logger.debug { ">>> byte response -> ${message.content.size}byte" }
+
+                    queue.send(BinaryMessage(message.content))
+                }
+
+                is WebSocketTextResponse -> {
+                    val payload = mapper.writeValueAsString(message)
+
+                    logger.debug { ">>> response payload: $payload" }
+
+                    queue.send(TextMessage(payload))
+                }
+            }
         }
     }
 
