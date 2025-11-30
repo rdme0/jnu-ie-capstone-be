@@ -12,14 +12,17 @@ import jnu.ie.capstone.session.dto.internal.ServerReadyDTO
 import jnu.ie.capstone.session.dto.internal.ShoppingCartMenuDTO
 import jnu.ie.capstone.session.dto.internal.ShoppingCartResponseDTO
 import jnu.ie.capstone.session.dto.internal.StateChangeDTO
-import jnu.ie.capstone.session.dto.response.SessionResponse
+import jnu.ie.capstone.session.dto.response.WebSocketTextResponse
 import jnu.ie.capstone.session.enums.MessageType.*
 import jnu.ie.capstone.session.enums.SessionState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import mu.KotlinLogging
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.tuple
@@ -69,7 +72,7 @@ class KioskAiSessionHandlerE2ETest(
     private lateinit var accessToken: String
 
     private lateinit var readyLatch: CompletableDeferred<Unit>
-    private lateinit var endOfTurnLatch: CompletableDeferred<Unit>
+    private val turnEndChannel = Channel<Unit>(Channel.UNLIMITED)
     private lateinit var stateChangeLatch: CompletableDeferred<SessionState>
 
     private var myShoppingCart: List<ShoppingCartMenuDTO> = mutableListOf()
@@ -94,14 +97,27 @@ class KioskAiSessionHandlerE2ETest(
             withTimeout(5000) { connectionLatch.await() }
 
             withTimeout(10000) { readyLatch.await() }
+
+            logger.info { "서버 준비 완료!" }
+
             assertThat(nowState).isEqualTo(SessionState.MENU_SELECTION)
-            logger.info { "서버 준비 완료! 음성 전송을 시작합니다." }
+
+            logger.info { "Gemini의 첫 인사 대기 (혹은 패스)" }
+            val firstGreeting = withTimeoutOrNull(5000) {
+                turnEndChannel.receive()
+                logger.info("Gemini가 먼저 인사함!")
+            }
+            if (firstGreeting == null) logger.info("Gemini가 먼저 인사하지 않음 (조용)")
 
             logger.info { "--- PHASE 1 : '아샷추' 4잔 주문 ---" }
 
-            endOfTurnLatch = CompletableDeferred()
+            while (turnEndChannel.tryReceive().isSuccess) {
+            }
+
             sendWavFile(session, "classpath:test/아샷추.wav")
-            waitForGeminiTurnToEnd(session, endOfTurnLatch)
+
+            waitForGeminiTurnToEnd(session)
+
             logger.info("--- PHASE 1 완료 ---")
 
             assertThat(myShoppingCart).hasSize(4)
@@ -123,9 +139,12 @@ class KioskAiSessionHandlerE2ETest(
             delay(500)
 
             logger.info("--- PHASE 2 : '아아' 주문 ---")
-            endOfTurnLatch = CompletableDeferred()
+
+            while (turnEndChannel.tryReceive().isSuccess) {
+            }
             sendWavFile(session, "classpath:test/아아.wav")
-            waitForGeminiTurnToEnd(session, endOfTurnLatch)
+            waitForGeminiTurnToEnd(session)
+
             logger.info { "--- PHASE 2 완료 ---" }
 
             assertThat(myShoppingCart).hasSize(6)
@@ -145,10 +164,12 @@ class KioskAiSessionHandlerE2ETest(
             delay(500)
 
             logger.info("--- PHASE 3 : '이대로 주문해줘' ---")
-            endOfTurnLatch = CompletableDeferred()
+            while (turnEndChannel.tryReceive().isSuccess) {
+            }
+
             stateChangeLatch = CompletableDeferred()
             sendWavFile(session, "classpath:test/이대로 주문해줘.wav")
-            waitForGeminiTurnToEnd(session, endOfTurnLatch)
+            waitForGeminiTurnToEnd(session)
 
             withTimeout(10000) { stateChangeLatch.await() }
 
@@ -179,7 +200,7 @@ class KioskAiSessionHandlerE2ETest(
                     val payload = message.payload
                     logger.debug { "테스트 클라이언트 수신 (Text): $payload" }
 
-                    val response = mapper.readValue<SessionResponse>(payload)
+                    val response = mapper.readValue<WebSocketTextResponse>(payload)
 
                     when (response.messageType) {
                         SERVER_READY -> {
@@ -190,7 +211,7 @@ class KioskAiSessionHandlerE2ETest(
 
                         OUTPUT_TEXT_RESULT -> {
                             logger.info { ">>> Gemini 턴 종료 메시지 수신 <<<" }
-                            endOfTurnLatch.complete(Unit)
+                            turnEndChannel.trySend(Unit)
                         }
 
                         UPDATE_SHOPPING_CART -> {
@@ -244,8 +265,7 @@ class KioskAiSessionHandlerE2ETest(
     }
 
     private suspend fun waitForGeminiTurnToEnd(
-        session: WebSocketSession,
-        latch: CompletableDeferred<Unit>
+        session: WebSocketSession
     ) {
         logger.info("Gemini 턴 종료 대기 시작. 침묵 스트림을 전송합니다.")
         val silenceMs = geminiConfig.silenceDurationMs.toLong()
@@ -254,15 +274,20 @@ class KioskAiSessionHandlerE2ETest(
 
         try {
             withTimeout(15000) {
-                val job = launch {
+                val silenceJob = launch {
                     repeat(silenceIterations.toInt()) {
-                        if (!session.isOpen || latch.isCompleted) return@launch
+                        if (!isActive) return@repeat
                         session.sendMessage(BinaryMessage(silentChunk))
                         delay(100)
                     }
                 }
-                latch.await()
-                job.cancel()
+
+                try {
+                    turnEndChannel.receive()
+                } finally {
+                    silenceJob.cancel()
+                    logger.debug("침묵 전송 Job 취소됨")
+                }
             }
         } catch (e: Exception) {
             logger.error("Gemini 턴을 기다리는 도중 타임아웃 또는 에러 발생", e)
