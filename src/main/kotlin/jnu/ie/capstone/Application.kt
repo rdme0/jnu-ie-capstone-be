@@ -1,6 +1,5 @@
 package jnu.ie.capstone
 
-import jnu.ie.capstone.rtzr.config.RtzrConfig
 import jnu.ie.capstone.common.security.config.UriSecurityConfig
 import jnu.ie.capstone.gemini.config.GeminiConfig
 import jnu.ie.capstone.gemini.config.PromptConfig
@@ -16,7 +15,6 @@ import org.springframework.data.web.config.EnableSpringDataWebSupport
 @EnableConfigurationProperties(
     UriSecurityConfig::class,
     GeminiConfig::class,
-    RtzrConfig::class,
     PromptConfig::class
 )
 class Application
