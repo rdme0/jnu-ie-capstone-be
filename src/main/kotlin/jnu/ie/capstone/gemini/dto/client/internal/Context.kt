@@ -10,17 +10,13 @@ sealed interface Context {
     }
 
     data class MenuSelectionContext(
-        val menus: List<MenuInternalDTO>,
         val shoppingCart: ShoppingCartDTO,
         val nowState: SessionState = SessionState.MENU_SELECTION
     ) : Context {
         override fun toString(): String {
-            val menusText = menus
-                .joinToString("\n" + "_".repeat(20) + "\n") { it.toString() }
-
             val shoppingCartText = "장바구니 : [\n${shoppingCart}\n]"
 
-            return menusText + DIVIDER + shoppingCartText + DIVIDER + "현재 상태 : " + nowState
+            return shoppingCartText + DIVIDER + "현재 상태 : " + nowState
         }
     }
 
