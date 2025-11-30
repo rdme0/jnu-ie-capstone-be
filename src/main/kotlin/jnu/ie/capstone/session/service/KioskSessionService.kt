@@ -241,7 +241,7 @@ class KioskSessionService(
                     GeminiInput.ToolResponse(
                         id = output.id,
                         functionName = output.signature.name,
-                        result = relevantMenus.joinToString("\n\n" + { "-".repeat(20) } + "\n\n") { it.toString() }
+                        result = relevantMenus.joinToString("\n\n" + "-".repeat(20) + "\n\n") { it.toString() }
                     )
                 )
             }
