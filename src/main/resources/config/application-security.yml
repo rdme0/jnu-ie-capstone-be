@@ -23,5 +23,6 @@ uri:
   allowed-front-end-origins:
     - http://localhost:*
     - https://localhost:*
+    - https://voicekiosk.vercel.app
   success-path: /auth/success
   default-redirect-origin: http://localhost:3000
