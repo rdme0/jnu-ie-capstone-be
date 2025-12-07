@@ -23,15 +23,8 @@ object GeminiFunctionDeclaration {
         .functionDeclarations(
             listOf(
                 FunctionDeclaration.builder()
-                    .name(CONFIRM_CART.text)
-                    .description("State $MENU_SELECTION -> $CART_CONFIRMATION")
-                    .response(GeminiSchema.STATE_MACHINE_RESPONSE_SCHEMA)
-                    .behavior(Behavior.Known.BLOCKING)
-                    .build(),
-
-                FunctionDeclaration.builder()
                     .name(CONFIRM_PAYMENT.text)
-                    .description("State $CART_CONFIRMATION -> $PAYMENT_CONFIRMATION")
+                    .description("State $MENU_SELECTION -> $PAYMENT_CONFIRMATION")
                     .response(GeminiSchema.STATE_MACHINE_RESPONSE_SCHEMA)
                     .behavior(Behavior.Known.BLOCKING)
                     .build(),
@@ -52,7 +45,7 @@ object GeminiFunctionDeclaration {
 
                 FunctionDeclaration.builder()
                     .name(PREVIOUS.text)
-                    .description("State (${PAYMENT_CONFIRMATION} OR ${CART_CONFIRMATION}) -> $MENU_SELECTION")
+                    .description("State $PAYMENT_CONFIRMATION -> $MENU_SELECTION")
                     .response(GeminiSchema.STATE_MACHINE_RESPONSE_SCHEMA)
                     .behavior(Behavior.Known.BLOCKING)
                     .build(),
