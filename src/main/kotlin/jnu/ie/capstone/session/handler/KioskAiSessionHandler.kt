@@ -147,7 +147,7 @@ class KioskAiSessionHandler(
 
         if (result.isSuccess) {
             val currentSize = queueSize.incrementAndGet()
-            logger.info { "Session[${session.id}] Queue Size: $currentSize / 128" }
+            logger.debug { "Session[${session.id}] Queue Size: $currentSize / 128" }
         } else {
             clientVoiceChannel.tryReceive().getOrNull()
             queueSize.decrementAndGet()

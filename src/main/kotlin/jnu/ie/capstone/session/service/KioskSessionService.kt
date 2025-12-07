@@ -77,10 +77,10 @@ class KioskSessionService(
         val contextSlowInput: Flow<Text> = handleContextByState(nowState, shoppingCart)
             .onEach { logger.info { "gemini slow input -> $it" } }
 
-        val toolResponseChannel = Channel<GeminiInput.ToolResponse>(Channel.BUFFERED)
-        val toolResponseInput = toolResponseChannel.receiveAsFlow()
+        val geminiInputChannel = Channel<GeminiInput>(Channel.BUFFERED)
+        val geminiInputFlow = geminiInputChannel.receiveAsFlow()
 
-        val mergedInput = merge(voiceFastInput, contextSlowInput, toolResponseInput)
+        val mergedInput = merge(voiceFastInput, contextSlowInput, geminiInputFlow)
             .onEach { logger.debug { "gemini merged input -> $it" } }
 
         liveClient
@@ -92,7 +92,7 @@ class KioskSessionService(
                     storeId,
                     ownerInfo,
                     shoppingCart,
-                    toolResponseChannel
+                    geminiInputChannel = geminiInputChannel
                 ) { message -> onReply(message) }
             }
     }
@@ -140,7 +140,7 @@ class KioskSessionService(
         storeId: Long,
         ownerInfo: MemberInfo,
         shoppingCart: ShoppingCartDTO,
-        toolResponseChannel: Channel<GeminiInput.ToolResponse>,
+        geminiInputChannel: Channel<GeminiInput>,
         onReply: suspend (WebSocketResponse) -> Unit
     ) {
         when (output) {
@@ -167,7 +167,7 @@ class KioskSessionService(
                             functionCall = output,
                             event = sessionEvent,
                             stateMachine = stateMachine,
-                            toolResponseChannel = toolResponseChannel,
+                            geminiInputChannel = geminiInputChannel,
                         ) { textResponse -> onReply(textResponse) }
                     }
                     ?: run {
@@ -176,7 +176,7 @@ class KioskSessionService(
                             storeId,
                             ownerInfo,
                             shoppingCart,
-                            toolResponseChannel,
+                            geminiInputChannel,
                         ) { textResponse -> onReply(textResponse) }
                     }
             }
@@ -196,7 +196,7 @@ class KioskSessionService(
         functionCall: FunctionCall,
         event: SessionEvent,
         stateMachine: StateMachine<SessionState, SessionEvent>,
-        toolResponseChannel: Channel<GeminiInput.ToolResponse>,
+        geminiInputChannel: Channel<GeminiInput>,
         onReply: suspend (WebSocketTextResponse) -> Unit
     ) {
         withSessionLock(stateMachine.id) {
@@ -212,7 +212,7 @@ class KioskSessionService(
             } catch (e: Exception) {
                 logger.error(e) { "State machine error processing event $event: ${e.message}" }
             } finally {
-                sendOKToGemini(functionCall, toolResponseChannel)
+                sendOKToGemini(functionCall, geminiInputChannel)
             }
         }
     }
@@ -250,7 +250,7 @@ class KioskSessionService(
         storeId: Long,
         ownerInfo: MemberInfo,
         shoppingCart: ShoppingCartDTO,
-        toolResponseChannel: Channel<GeminiInput.ToolResponse>,
+        geminiInputChannel: Channel<GeminiInput>,
         onReply: suspend (WebSocketTextResponse) -> Unit
     ) {
         logger.info { "쇼핑카트 before -> $shoppingCart" }
@@ -266,7 +266,7 @@ class KioskSessionService(
                     ownerInfo = ownerInfo
                 )
 
-                toolResponseChannel.send(
+                geminiInputChannel.send(
                     GeminiInput.ToolResponse(
                         id = output.id,
                         functionName = output.signature.name,
@@ -285,7 +285,9 @@ class KioskSessionService(
                     addItems = params
                 )
 
-                sendOKToGemini(output, toolResponseChannel)
+                sendOKToGemini(output, geminiInputChannel)
+
+                geminiInputChannel.send(Text(MenuSelectionContext(shoppingCart = shoppingCart)))
             }
 
             REMOVE_MENUS_OR_OPTIONS -> {
@@ -296,20 +298,23 @@ class KioskSessionService(
                     removeItems = params
                 )
 
-                sendOKToGemini(output, toolResponseChannel)
+                sendOKToGemini(output, geminiInputChannel)
+
+                geminiInputChannel.send(Text(MenuSelectionContext(shoppingCart = shoppingCart)))
             }
 
             DO_NOTHING -> {
-                sendOKToGemini(output, toolResponseChannel)
+                sendOKToGemini(output, geminiInputChannel)
             }
 
             else -> {
-                sendOKToGemini(output, toolResponseChannel)
+                sendOKToGemini(output, geminiInputChannel)
             }
         }
 
         if (isCartUpdated) {
             onReply(WebSocketTextResponse.fromUpdateShoppingCart(shoppingCart.toResponseDTO()))
+
         }
 
         logger.info { "쇼핑카트 after -> $shoppingCart" }
@@ -317,9 +322,9 @@ class KioskSessionService(
 
     private suspend fun sendOKToGemini(
         functionCall: FunctionCall,
-        toolResponseChannel: Channel<GeminiInput.ToolResponse>
+        geminiInputChannel: Channel<GeminiInput>
     ) {
-        toolResponseChannel.send(
+        geminiInputChannel.send(
             GeminiInput.ToolResponse(
                 id = functionCall.id,
                 functionName = functionCall.signature.name,
