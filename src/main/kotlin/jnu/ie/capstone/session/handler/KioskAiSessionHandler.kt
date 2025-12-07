@@ -16,7 +16,7 @@ import jnu.ie.capstone.session.registry.WebSocketSessionRegistry
 import jnu.ie.capstone.session.service.KioskSessionService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
 import mu.KotlinLogging
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.statemachine.StateMachine
@@ -28,6 +28,7 @@ import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.BinaryWebSocketHandler
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.collections.set
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -42,7 +43,8 @@ class KioskAiSessionHandler(
 
     private companion object {
         const val SESSION_SCOPE_KEY = "sessionScope"
-        const val CLIENT_VOICE_STREAM_KEY = "clientVoiceStream"
+        const val CLIENT_VOICE_CHANNEL_KEY = "clientVoiceStream"
+        const val VOICE_QUEUE_SIZE_KEY = "voiceQueueSize"
         const val SHOPPING_CART_KEY = "shoppingCart"
         const val REPLIER_KEY = "replier"
         const val PRINCIPAL_KEY = "principal"
@@ -71,12 +73,15 @@ class KioskAiSessionHandler(
 
         session.attributes[REPLIER_KEY] = replier
 
-        val clientVoiceStream = MutableSharedFlow<ByteArray>(
-            extraBufferCapacity = 128, // 0.1초 마다 청크 보낼 시 12.8초 정도 저장 가능
-            onBufferOverflow = BufferOverflow.DROP_OLDEST
+        val queueSize = AtomicInteger(0)
+        session.attributes[VOICE_QUEUE_SIZE_KEY] = queueSize
+
+        val clientVoiceChannel = Channel<ByteArray>(
+            capacity = 128, // 0.1초 마다 청크 보낼 시 12.8초 정도 저장 가능
+            onBufferOverflow = BufferOverflow.SUSPEND
         )
 
-        session.attributes[CLIENT_VOICE_STREAM_KEY] = clientVoiceStream
+        session.attributes[CLIENT_VOICE_CHANNEL_KEY] = clientVoiceChannel
 
         val authentication =
             session.attributes[PRINCIPAL_KEY] as? UsernamePasswordAuthenticationToken
@@ -106,7 +111,8 @@ class KioskAiSessionHandler(
                 try {
                     service.processVoiceChunk(
                         geminiReadySignal,
-                        clientVoiceStream,
+                        clientVoiceChannel,
+                        queueSize,
                         storeId,
                         userDetails.memberInfo,
                         stateMachine,
@@ -128,16 +134,32 @@ class KioskAiSessionHandler(
     }
 
     override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
-        val clientVoiceStream =
-            session.attributes[CLIENT_VOICE_STREAM_KEY] as? MutableSharedFlow<ByteArray>
+        val clientVoiceChannel =
+            session.attributes[CLIENT_VOICE_CHANNEL_KEY] as Channel<ByteArray>
+
+        val queueSize =
+            session.attributes[VOICE_QUEUE_SIZE_KEY] as AtomicInteger
 
         val bytes = ByteArray(message.payload.remaining())
         message.payload.get(bytes)
 
-        val emitted = clientVoiceStream?.tryEmit(bytes)
+        val result = clientVoiceChannel.trySend(bytes)
 
-        if (emitted == false)
-            logger.warn { "세션 ${session.id}의 음성 스트림 버퍼가 가득 찼습니다." }
+        if (result.isSuccess) {
+            val currentSize = queueSize.incrementAndGet()
+            logger.info { "Session[${session.id}] Queue Size: $currentSize / 128" }
+        } else {
+            clientVoiceChannel.tryReceive().getOrNull()
+            queueSize.decrementAndGet()
+
+            val retryResult = clientVoiceChannel.trySend(bytes)
+            if (retryResult.isSuccess) {
+                val currentSize = queueSize.incrementAndGet()
+                logger.warn { "Session[${session.id}] Queue Full! Dropped oldest. Size: $currentSize / 128" }
+            } else {
+                logger.error { "Session[${session.id}] Critical: Failed to force send voice data." }
+            }
+        }
 
     }
 

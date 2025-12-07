@@ -25,9 +25,8 @@ import jnu.ie.capstone.session.enums.SessionState
 import jnu.ie.capstone.session.enums.SessionState.*
 import jnu.ie.capstone.session.service.internal.KioskShoppingCartService
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.supervisorScope
@@ -40,6 +39,7 @@ import org.springframework.stereotype.Service
 import org.springframework.web.socket.WebSocketSession
 import reactor.core.publisher.Mono
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 @Service
 class KioskSessionService(
@@ -58,30 +58,26 @@ class KioskSessionService(
 
     suspend fun processVoiceChunk(
         geminiReadySignal: CompletableDeferred<Unit>,
-        voiceStream: Flow<ByteArray>,
+        voiceChannel: ReceiveChannel<ByteArray>,
+        queueSize: AtomicInteger,
         storeId: Long,
         ownerInfo: MemberInfo,
         stateMachine: StateMachine<SessionState, SessionEvent>,
         session: WebSocketSession,
         onReply: suspend (WebSocketResponse) -> Unit
     ) = supervisorScope {
-        val currentScope: CoroutineScope = this
-
-        val sharedVoiceStream = voiceStream
-            .buffer(capacity = 128, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-            .shareIn(scope = currentScope, started = SharingStarted.Lazily)
-
+        val voiceStream = voiceChannel.receiveAsFlow()
+            .onEach {
+                val remain = queueSize.decrementAndGet()
+                logger.debug { "Consumed. Remain : $remain" }
+            }
         val shoppingCart = session.attributes[SHOPPING_CART_KEY] as ShoppingCartDTO
-
         val nowState = stateMachine.state.id
-
-        val voiceFastInput: Flow<Audio> = sharedVoiceStream.map { Audio(it) }
-
+        val voiceFastInput: Flow<Audio> = voiceStream.map { Audio(it) }
         val contextSlowInput: Flow<Text> = handleContextByState(nowState, shoppingCart)
             .onEach { logger.info { "gemini slow input -> $it" } }
 
         val toolResponseChannel = Channel<GeminiInput.ToolResponse>(Channel.BUFFERED)
-
         val toolResponseInput = toolResponseChannel.receiveAsFlow()
 
         val mergedInput = merge(voiceFastInput, contextSlowInput, toolResponseInput)
