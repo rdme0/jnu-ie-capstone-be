@@ -2,7 +2,6 @@ package jnu.ie.capstone.session.enums
 
 
 enum class SessionEvent {
-    CONFIRM_CART,
     CONFIRM_PAYMENT,
     PROCESS_PAYMENT,
     PREVIOUS,

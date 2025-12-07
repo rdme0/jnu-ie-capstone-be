@@ -1,11 +1,15 @@
 package jnu.ie.capstone.session.handler
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
 import jnu.ie.capstone.common.websocket.factory.WebSocketReplierFactory
 import jnu.ie.capstone.common.websocket.util.WebSocketReplier
 import jnu.ie.capstone.session.dto.internal.ShoppingCartDTO
+import jnu.ie.capstone.session.dto.request.WebSocketTextRequest
 import jnu.ie.capstone.session.dto.response.WebSocketResponse
 import jnu.ie.capstone.session.dto.response.WebSocketTextResponse
+import jnu.ie.capstone.session.enums.MessageType
 import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
 import jnu.ie.capstone.session.registry.WebSocketSessionRegistry
@@ -20,17 +24,20 @@ import org.springframework.statemachine.config.StateMachineFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.BinaryMessage
 import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.BinaryWebSocketHandler
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.collections.set
 import kotlin.coroutines.cancellation.CancellationException
 
 @Component
 class KioskAiSessionHandler(
-    private val kioskSessionService: KioskSessionService,
+    private val service: KioskSessionService,
     private val stateMachineFactory: StateMachineFactory<SessionState, SessionEvent>,
     private val replierFactory: WebSocketReplierFactory,
-    private val sessionRegistry: WebSocketSessionRegistry
+    private val sessionRegistry: WebSocketSessionRegistry,
+    private val mapper: ObjectMapper
 ) : BinaryWebSocketHandler() {
 
     private companion object {
@@ -60,7 +67,7 @@ class KioskAiSessionHandler(
 
         session.attributes[SESSION_SCOPE_KEY] = webSocketSessionScope
 
-        val replier : WebSocketReplier = replierFactory.create(session, webSocketSessionScope)
+        val replier: WebSocketReplier = replierFactory.create(session, webSocketSessionScope)
 
         session.attributes[REPLIER_KEY] = replier
 
@@ -97,7 +104,7 @@ class KioskAiSessionHandler(
 
             launch {
                 try {
-                    kioskSessionService.processVoiceChunk(
+                    service.processVoiceChunk(
                         geminiReadySignal,
                         clientVoiceStream,
                         storeId,
@@ -134,6 +141,43 @@ class KioskAiSessionHandler(
 
     }
 
+    override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
+        val payload = message.payload
+
+        logger.info { "Client sent (Text): $payload" }
+
+        val request: WebSocketTextRequest = runCatching {
+            mapper.readValue<WebSocketTextRequest>(payload)
+        }
+            .onFailure {
+                logger.error(it) { "TextMessage parsing error: $payload" }
+                return
+            }
+            .getOrNull() ?: return
+
+        val stateMachine = sessionStateMachines[session.id]
+            ?: run {
+                logger.error { "state machine not found" }
+                return
+            }
+
+        val webSocketSessionScope = session.attributes[SESSION_SCOPE_KEY] as? CoroutineScope
+            ?: run {
+                logger.error { "session scope not found" }
+                return
+            }
+
+        when (request.messageType) {
+            MessageType.PROCESS_PAYMENT -> {
+                webSocketSessionScope.launch {
+                    service.processPayment(stateMachine = stateMachine, onReply = reply(session))
+                }
+            }
+
+            else -> {}
+        }
+    }
+
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         logger.info { "Client disconnected: ${session.id}, code: ${status.code}, reason: ${status.reason}" }
 
@@ -145,7 +189,7 @@ class KioskAiSessionHandler(
 
         sessionRegistry.unregister(session.id)
 
-        kioskSessionService.cleanupSession(session.id)
+        service.cleanupSession(session.id)
     }
 
     private fun initializeStateMachine(session: WebSocketSession): StateMachine<SessionState, SessionEvent> {

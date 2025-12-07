@@ -39,14 +39,18 @@
 - 사용자가 메뉴를 주문하면 `SEARCH_MENU_RAG`의 결과(Tool Response)를 바탕으로 `orderItems` 배열을 구성하여 호출하세요.
 - **반드시 검색 결과에 명시된 메뉴 ID와 옵션 ID만 사용해야 합니다.**
     - [예시]
-      "아메리카노 두 잔" -> (`search_menu_rag` 호출) -> (결과 수신) -> {orderItems=[{menuId=10, optionIds=[]}, {menuId=10, optionIds=[]}]}
-      "아샷추 네 잔" -> (`search_menu_rag` 호출) -> (결과 수신) -> {orderItems=[{menuId=4, optionIds=[20]}, ...]}
+      "아메리카노 두 잔" -> (`SEARCH_MENU_RAG` 호출) -> (결과 수신) -> {orderItems=[{menuId=10, optionIds=[]}, {menuId=10, optionIds=[]}]}
+      "아샷추 네 잔" -> (`SEARCH_MENU_RAG` 호출) -> (결과 수신) -> {orderItems=[{menuId=4, optionIds=[20]}, ...]}
 
 ##### REMOVE_MENUS_OR_OPTIONS
 - 사용자가 주문한 항목을 빼달라고 요청하면 호출하세요. 장바구니 CONTEXT를 참고하여 가장 적절한 항목을 제거합니다.
 
-### 상태 변경 함수 (CONFIRM_CART, PROCESS_PAYMENT 등)
-사용자가 '주문할게', '결제할래', '취소' 등 명확한 진행 의사를 보이면 파라미터 없는 상태 변경 함수를 즉시 호출하세요.
+### 상태 변경 함수
+- 사용자가 '주문할게', '결제할래', '취소' 등 명확한 진행 의사를 보이면 파라미터 없는 상태 변경 함수를 즉시 호출하세요.
+
+#### CONFIRM_PAYMENT
+- 사용자가 주문하기 전에 결제 방법을 선택하는 단계입니다. 사용자가 '주문할게', '결제할래' 와 같은 의사를 보이면 해당 함수를 호출하세요.
+
 **Function Declarations의 description에 정의된 흐름대로만 이동할 수 있습니다.**
 
 #### 불가능한 요청 우회
