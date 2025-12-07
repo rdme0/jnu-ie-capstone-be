@@ -15,7 +15,6 @@ enum class GeminiFunctionSignature(
 
     CONFIRM_CART(GeminiFunctionParams.NoParams::class),
     CONFIRM_PAYMENT(GeminiFunctionParams.NoParams::class),
-    PROCESS_PAYMENT(GeminiFunctionParams.NoParams::class),
     PREVIOUS(GeminiFunctionParams.NoParams::class),
     CANCEL(GeminiFunctionParams.NoParams::class);
 

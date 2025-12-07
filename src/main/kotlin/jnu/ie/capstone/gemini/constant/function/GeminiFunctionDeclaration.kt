@@ -30,13 +30,6 @@ object GeminiFunctionDeclaration {
                     .build(),
 
                 FunctionDeclaration.builder()
-                    .name(PROCESS_PAYMENT.text)
-                    .description("State $PAYMENT_CONFIRMATION -> $COMPLETED")
-                    .response(GeminiSchema.STATE_MACHINE_RESPONSE_SCHEMA)
-                    .behavior(Behavior.Known.BLOCKING)
-                    .build(),
-
-                FunctionDeclaration.builder()
                     .name(CANCEL.text)
                     .description("Any State -> $CANCELLED")
                     .response(GeminiSchema.STATE_MACHINE_RESPONSE_SCHEMA)
