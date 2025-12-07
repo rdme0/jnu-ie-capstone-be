@@ -225,6 +225,7 @@ class GeminiLiveClient(
                             logger.error(exception) { "audio chunk 보내는 중 에러 발생 -> ${exception.message}" }
                             return@exceptionally null
                         }
+                        .await()
                 }
 
                 is GeminiInput.Text -> {
