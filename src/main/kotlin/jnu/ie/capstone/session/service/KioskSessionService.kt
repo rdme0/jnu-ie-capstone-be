@@ -101,6 +101,25 @@ class KioskSessionService(
             }
     }
 
+    suspend fun processPayment(
+        stateMachine: StateMachine<SessionState, SessionEvent>,
+        onReply: suspend (WebSocketResponse) -> Unit
+    ) {
+
+        //실제 결제 과정 생략
+
+        val stateChange = executeStateTransition(
+            stateMachine = stateMachine,
+            event = SessionEvent.PROCESS_PAYMENT
+        )
+
+        if (stateChange != null) {
+            onReply(WebSocketTextResponse.fromStateChange(stateChange))
+        } else {
+            logger.error { "상태가 바뀌지 않음 -> oldState: ${stateMachine.state.id}, event: ${SessionEvent.PROCESS_PAYMENT}" }
+        }
+    }
+
     fun cleanupSession(sessionId: String) {
         stateMachineLocks.remove(sessionId)
         logger.info { "Cleaned up lock for session: $sessionId" }
@@ -112,9 +131,9 @@ class KioskSessionService(
     ): Flow<Text> = when (nowState) {
         MENU_SELECTION -> flowOf(Text(MenuSelectionContext(shoppingCart = shoppingCart)))
 
-        CART_CONFIRMATION -> flowOf(Text(CartConfirmationContext(shoppingCart = shoppingCart)))
+//        CART_CONFIRMATION -> flowOf(Text(CartConfirmationContext(shoppingCart = shoppingCart)))
 
-        PAYMENT_CONFIRMATION -> flowOf(Text(PaymentConfirmationContext(shoppingCart = shoppingCart)))
+//        PAYMENT_CONFIRMATION -> flowOf(Text(PaymentConfirmationContext(shoppingCart = shoppingCart)))
 
         else -> flowOf(Text(NoContext))
     }
@@ -184,35 +203,49 @@ class KioskSessionService(
         toolResponseChannel: Channel<GeminiInput.ToolResponse>,
         onReply: suspend (WebSocketTextResponse) -> Unit
     ) {
-        val sessionId = stateMachine.id
-        val mutex = stateMachineLocks.computeIfAbsent(sessionId) { Mutex() }
-
-        mutex.withLock {
-            // mutex 사용 이유 : oldState와 newState 간의 동시성 문제가 발생 가능
-            val oldState = stateMachine.state.id
-            logger.info { "old state -> $oldState" }
-
-            val message = MessageBuilder.withPayload(event).build()
-
+        withSessionLock(stateMachine.id) {
             try {
-                stateMachine.sendEvent(Mono.just(message)).awaitFirstOrNull()
+                val stateChange = executeStateTransition(stateMachine, event)
 
-                val newState = stateMachine.state.id
-                logger.info { "new state -> $newState" }
-
-                if (newState == oldState) {
-                    logger.error { "상태가 바뀌지 않음 -> oldState: $oldState, event: $event" }
-                    return@withLock
+                if (stateChange != null) {
+                    onReply(WebSocketTextResponse.fromStateChange(stateChange))
+                } else {
+                    logger.error { "상태가 바뀌지 않음 -> oldState: ${stateMachine.state.id}, event: $event" }
                 }
 
-                val content = StateChangeDTO(from = oldState, to = newState, because = event)
-
-                onReply(WebSocketTextResponse.fromStateChange(content))
             } catch (e: Exception) {
                 logger.error(e) { "State machine error processing event $event: ${e.message}" }
             } finally {
                 sendOKToGemini(functionCall, toolResponseChannel)
             }
+        }
+    }
+
+    private suspend fun executeStateTransition(
+        stateMachine: StateMachine<SessionState, SessionEvent>,
+        event: SessionEvent
+    ): StateChangeDTO? {
+        val oldState = stateMachine.state.id
+        logger.info { "old state -> $oldState" }
+
+        val message = MessageBuilder.withPayload(event).build()
+
+        stateMachine.sendEvent(Mono.just(message)).awaitFirstOrNull()
+
+        val newState = stateMachine.state.id
+        logger.info { "new state -> $newState" }
+
+        return if (oldState != newState) {
+            StateChangeDTO(from = oldState, to = newState, because = event)
+        } else {
+            null
+        }
+    }
+
+    private suspend fun <T> withSessionLock(sessionId: String, action: suspend () -> T): T {
+        val mutex = stateMachineLocks.computeIfAbsent(sessionId) { Mutex() }
+        return mutex.withLock {
+            action()
         }
     }
 

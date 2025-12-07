@@ -177,7 +177,7 @@ class KioskAiSessionHandlerE2ETest(
 
             logger.info { "nowState -> $nowState" }
 
-            assertThat(nowState).isEqualTo(SessionState.CART_CONFIRMATION)
+            assertThat(nowState).isEqualTo(SessionState.PAYMENT_CONFIRMATION)
 
             logger.info { "모든 E2E 테스트 시나리오 완료. 5초 후 세션을 종료합니다." }
             delay(5000)
@@ -233,7 +233,9 @@ class KioskAiSessionHandlerE2ETest(
                 }
             }
 
-            override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {}
+            override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
+                logger.debug { "바이너리 메세지 수신 -> ${message.payloadLength}바이트" }
+            }
 
             override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
                 logger.warn("테스트 클라이언트 연결 종료: ${session.id}, status: $status")
