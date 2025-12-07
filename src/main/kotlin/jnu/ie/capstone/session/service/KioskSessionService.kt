@@ -286,8 +286,6 @@ class KioskSessionService(
                 )
 
                 sendOKToGemini(output, geminiInputChannel)
-
-                geminiInputChannel.send(Text(MenuSelectionContext(shoppingCart = shoppingCart)))
             }
 
             REMOVE_MENUS_OR_OPTIONS -> {
@@ -299,8 +297,6 @@ class KioskSessionService(
                 )
 
                 sendOKToGemini(output, geminiInputChannel)
-
-                geminiInputChannel.send(Text(MenuSelectionContext(shoppingCart = shoppingCart)))
             }
 
             DO_NOTHING -> {
@@ -314,7 +310,8 @@ class KioskSessionService(
 
         if (isCartUpdated) {
             onReply(WebSocketTextResponse.fromUpdateShoppingCart(shoppingCart.toResponseDTO()))
-
+            geminiInputChannel.send(Text(MenuSelectionContext(shoppingCart = shoppingCart)))
+            logger.info { "변경된 장바구니 보냄 $shoppingCart" }
         }
 
         logger.info { "쇼핑카트 after -> $shoppingCart" }
