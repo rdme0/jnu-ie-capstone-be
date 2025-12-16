@@ -108,7 +108,7 @@ class GeminiLiveClient(
         processOutputSTT(message, outputSTTBuffer)
         processOutputVoiceStream(message)
         processFunctionCall(message)
-        processGenerationComplete(message, outputSTTBuffer, inputSTTBuffer)
+        processTurnComplete(message, outputSTTBuffer, inputSTTBuffer)
     }
 
     private fun ProducerScope<GeminiOutput>.processInputSTT(
@@ -190,16 +190,16 @@ class GeminiLiveClient(
     }
 
 
-    private fun ProducerScope<GeminiOutput>.processGenerationComplete(
+    private fun ProducerScope<GeminiOutput>.processTurnComplete(
         message: LiveServerMessage,
         outputSTTBuffer: StringBuilder,
         inputSTTBuffer: StringBuilder
     ) {
-        val isGenerationComplete = message.serverContent()
-            .flatMap { it.generationComplete() }
+        val isTurnComplete = message.serverContent()
+            .flatMap { it.turnComplete() }
             .orElse(false)
 
-        if (isGenerationComplete && outputSTTBuffer.isNotEmpty()) {
+        if (isTurnComplete && outputSTTBuffer.isNotEmpty()) {
             val finalInputSTT = inputSTTBuffer.toString()
             val finalOutputSTT = outputSTTBuffer.toString()
 
