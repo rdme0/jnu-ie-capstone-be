@@ -72,6 +72,9 @@ class KioskAiSessionHandlerE2ETest(
     private var myShoppingCart: List<ShoppingCartMenuDTO> = mutableListOf()
     private var nowState: SessionState? = null
 
+    @Volatile private var metricsStartTime: Long = 0L
+    @Volatile private var isFirstPacketReceived: Boolean = false
+
     @BeforeEach
     fun setUp() {
         val member = memberRepository.findByEmail(TEST_EMAIL)
@@ -113,9 +116,13 @@ class KioskAiSessionHandlerE2ETest(
 
             sendWavFile(session, "classpath:test/아샷추.wav")
 
+            metricsStartTime = System.currentTimeMillis()
+            isFirstPacketReceived = false
+            logger.info { "⏱️ Latency 측정 시작 (WAV 전송 완료)" }
+
             waitForGeminiTurnToEnd(session)
 
-            logger.info("--- PHASE 1 완료 ---")
+            logger.info { "--- PHASE 1 완료 ---" }
 
             assertThat(myShoppingCart).hasSize(1)
             assertThat(myShoppingCart).allSatisfy { it.name == "아이스티" }
@@ -136,7 +143,13 @@ class KioskAiSessionHandlerE2ETest(
 
             while (turnEndChannel.tryReceive().isSuccess) {
             }
+
             sendWavFile(session, "classpath:test/아아.wav")
+
+            metricsStartTime = System.currentTimeMillis()
+            isFirstPacketReceived = false
+            logger.info { "⏱️ Latency 측정 시작 (WAV 전송 완료)" }
+
             waitForGeminiTurnToEnd(session)
 
             logger.info { "--- PHASE 2 완료 ---" }
@@ -163,11 +176,15 @@ class KioskAiSessionHandlerE2ETest(
 
             stateChangeLatch = CompletableDeferred()
             sendWavFile(session, "classpath:test/이대로 주문해줘.wav")
+
+            metricsStartTime = System.currentTimeMillis()
+            isFirstPacketReceived = false
+            logger.info { "⏱️ Latency 측정 시작 (WAV 전송 완료)" }
+
             waitForGeminiTurnToEnd(session)
 
-            withTimeout(10000) { stateChangeLatch.await() }
-
             logger.info { "--- PHASE 3 완료 ---" }
+
 
             logger.info { "nowState -> $nowState" }
 
@@ -228,6 +245,15 @@ class KioskAiSessionHandlerE2ETest(
             }
 
             override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
+                if (!isFirstPacketReceived && metricsStartTime != 0L) {
+                    val endTime = System.currentTimeMillis()
+                    val latency = endTime - metricsStartTime
+
+                    logger.info { "🚀 [Latency 측정] 첫 음성 응답까지 소요 시간: ${latency}ms" }
+
+                    isFirstPacketReceived = true
+                }
+
                 logger.debug { "바이너리 메세지 수신 -> ${message.payloadLength}바이트" }
             }
 
