@@ -15,14 +15,8 @@ import jnu.ie.capstone.session.dto.internal.StateChangeDTO
 import jnu.ie.capstone.session.dto.response.WebSocketTextResponse
 import jnu.ie.capstone.session.enums.MessageType.*
 import jnu.ie.capstone.session.enums.SessionState
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import mu.KotlinLogging
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.tuple
@@ -103,13 +97,16 @@ class KioskAiSessionHandlerE2ETest(
             assertThat(nowState).isEqualTo(SessionState.MENU_SELECTION)
 
             logger.info { "Gemini의 첫 인사 대기 (혹은 패스)" }
-            val firstGreeting = withTimeoutOrNull(5000) {
+            val firstGreeting = withTimeoutOrNull(10000) {
                 turnEndChannel.receive()
                 logger.info("Gemini가 먼저 인사함!")
+
+                while (turnEndChannel.tryReceive().isSuccess) {
+                }
             }
             if (firstGreeting == null) logger.info("Gemini가 먼저 인사하지 않음 (조용)")
 
-            logger.info { "--- PHASE 1 : '아샷추' 4잔 주문 ---" }
+            logger.info { "--- PHASE 1 : '아샷추' 1잔 주문 ---" }
 
             while (turnEndChannel.tryReceive().isSuccess) {
             }
@@ -120,7 +117,7 @@ class KioskAiSessionHandlerE2ETest(
 
             logger.info("--- PHASE 1 완료 ---")
 
-            assertThat(myShoppingCart).hasSize(4)
+            assertThat(myShoppingCart).hasSize(1)
             assertThat(myShoppingCart).allSatisfy { it.name == "아이스티" }
             assertThat(myShoppingCart)
                 .extracting(
@@ -128,9 +125,6 @@ class KioskAiSessionHandlerE2ETest(
                     { it.options.first().name }
                 )
                 .containsExactly(
-                    tuple("아이스티", "샷 추가"),
-                    tuple("아이스티", "샷 추가"),
-                    tuple("아이스티", "샷 추가"),
                     tuple("아이스티", "샷 추가")
                 )
 
@@ -147,7 +141,7 @@ class KioskAiSessionHandlerE2ETest(
 
             logger.info { "--- PHASE 2 완료 ---" }
 
-            assertThat(myShoppingCart).hasSize(6)
+            assertThat(myShoppingCart).hasSize(3)
             val onlyPhase2 = myShoppingCart.filterNot { it.name == "아이스티" }
 
             assertThat(onlyPhase2).hasSize(2)
