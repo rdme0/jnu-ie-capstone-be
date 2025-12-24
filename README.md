@@ -1,6 +1,6 @@
 # 디지털 취약계층을 위한 대화형 음성 AI 에이전트 키오스크 구현
 
-![Project Banner](https://img.shields.io/badge/Project-Capstone-blue) ![Version](https://img.shields.io/badge/Version-2.0.0-green) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.4-brightgreen) ![Kotlin](https://img.shields.io/badge/Kotlin-2.2.0-purple) ![Gemini](https://img.shields.io/badge/AI-Gemini%20Live-orange)
+![Project Banner](https://img.shields.io/badge/Project-Capstone-blue) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.4-brightgreen) ![Kotlin](https://img.shields.io/badge/Kotlin-2.2.0-purple) ![Gemini](https://img.shields.io/badge/AI-Gemini%20Live-orange)
 
 ## 📖 프로젝트 소개 (Introduction)
 
@@ -11,7 +11,7 @@
 ### 💡 연구 배경 및 목표
 - **접근성 향상**: 복잡한 UI 학습 없이 음성만으로 주문 가능한 환경 모색.
 - **유연한 상호작용**: 정형화된 버튼 조작의 한계를 넘어, 자연어 대화를 통한 주문 처리 시도.
-- **신뢰성 확보**: 생성형 AI의 고질적인 환각(Hallucination) 현상을 **상태 머신(State Machine)**과 **RAG**를 통해 **완화(Mitigate)**하고자 노력함.
+- **신뢰성 확보**: 생성형 AI의 고질적인 **환각(Hallucination) 현상**을 **State Machine**과 **RAG**를 통해 **완화**하고자 노력함.
 
 ---
 
@@ -44,16 +44,20 @@
 
 ---
 
+## API 명세
+- **API 명세서 (Notion)**: [바로가기](https://spectacled-knight-5db.notion.site/API-28e399dcba9280008cd8f9008b04abcf?p=295399dcba9281a386baf76042c271ab&pm=s)
+
+--- 
 ## 🏗 시스템 구성 (System Architecture)
 
 ### 🛠 기술 스택
-| 구분 | 기술 |
-|----------|------------|
-| **Language** | **Kotlin 2.2.0**, **Java 21** |
+| 구분            | 기술                                                   |
+|---------------|------------------------------------------------------|
+| **Language**  | **Kotlin 2.2.0**, **Java 21**                        |
 | **Framework** | **Spring Boot 3.5.4**, WebFlux, Spring State Machine |
-| **Database** | **PostgreSQL 17** (pgvector) |
-| **AI** | **Google Gemini Live** |
-| **Protocol** | **WebSocket** |
+| **Database**  | **PostgreSQL 17** (pgvector)                         |
+| **AI**        | **Google Gemini Live**                               |
+| **Protocol**  | **WebSocket**                                        |
 
 ### 🔄 데이터 흐름 (Data Flow)
 ```mermaid
@@ -203,31 +207,63 @@ direction TB
     MenuCoordinateService ..> Menu : queries
     MenuCoordinateService ..> Option : queries
 ```
-
 ---
 
 ## 🚀 시작하기 (Getting Started)
 
 ### 사전 요구사항
-- **Java 21**, **Docker**
-- **Google AI Studio API Key**
 
-### 1. 실행 방법
+* **Java 21**
+* **Google AI Studio API Key**
+
+### 1. 프로젝트 클론
+
 ```bash
 git clone https://github.com/rdme0/jnu-ie-capstone-be.git
-# ... (.env 설정) ...
-./gradlew bootRun
+cd jnu-ie-capstone-be
+```
 
-### 5. API 사용 (WebSocket)
-- **API 명세서 (Notion)**: [바로가기](https://spectacled-knight-5db.notion.site/API-28e399dcba9280008cd8f9008b04abcf?p=295399dcba9281a386baf76042c271ab&pm=s)
-- **Endpoint**: `ws://localhost:8080/ws/session`
-- **Protocol**:
-    - **Upstream (Client -> Server)**: 
-        - Binary: PCM Audio (16kHz, 1ch, 16bit)
-        - Text: commands (예: `{"messageType": "PROCESS_PAYMENT"}`)
-    - **Downstream (Server -> Client)**:
-        - Binary: PCM Audio Response
-        - Text: JSON Events (`OUTPUT_TEXT_RESULT`, `UPDATE_SHOPPING_CART`, `CHANGE_STATE`)
+### 2. 환경 변수 설정
+
+프로젝트 루트 경로에 `.env` 파일을 생성하고, 아래 내용을 작성해 주세요.
+
+```properties
+# 1. Security & Auth
+AES256_KEY=
+JWT_SECRET_KEY=
+
+# 2. OAuth (Kakao)
+KAKAO_CLIENT_ID=
+KAKAO_CLIENT_SECRET=
+
+# 3. AI Service
+GEMINI_API_KEY=
+
+# 4. Server Configuration
+DEV_URL=
+PROD_URL=
+
+# 5. Database (Development)
+DEV_POSTGRES_URL=
+DEV_POSTGRES_PORT=
+DEV_POSTGRES_USERNAME=
+DEV_POSTGRES_PASSWORD=
+DEV_POSTGRES_DATABASE=
+
+# 6. Database (Production)
+PROD_POSTGRES_URL=
+PROD_POSTGRES_PORT=
+PROD_POSTGRES_USERNAME=
+PROD_POSTGRES_PASSWORD=
+PROD_POSTGRES_DATABASE=
+
+```
+
+### 3. 애플리케이션 실행
+
+```bash
+./gradlew bootRun
+```
 
 ---
 
