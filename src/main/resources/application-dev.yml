@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:15432/kiosk
+    url: jdbc:postgresql://${DEV_POSTGRES_URL}:${DEV_POSTGRES_PORT}/${DEV_POSTGRES_DATABASE}
     username: postgres
     password: 1
     driver-class-name: org.postgresql.Driver
@@ -8,11 +8,6 @@ spring:
     properties.hibernate.format_sql: true
     defer-datasource-initialization: true
     hibernate.ddl-auto: update
-  
-  data:
-    redis:
-      host: localhost
-      port: 16379
 
 spring.security.oauth2.client:
   registration:

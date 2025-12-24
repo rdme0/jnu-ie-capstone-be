@@ -1,18 +1,11 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${PROD_POSTGRES_URL}:${PROD_POSTGRES_PORT}/kiosk
+    url: jdbc:postgresql://${PROD_POSTGRES_URL}:${PROD_POSTGRES_PORT}//${PROD_POSTGRES_DATABASE}
     username: ${PROD_POSTGRES_USERNAME}
     password: ${PROD_POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate.ddl-auto: update
-
-  data:
-    redis:
-      host: ${PROD_REDIS_URL}
-      port: ${PROD_REDIS_PORT}
-      password: ${PROD_REDIS_PASSWORD}
-      database: ${PROD_REDIS_DATABASE}
 
 spring.security.oauth2.client:
   registration:
