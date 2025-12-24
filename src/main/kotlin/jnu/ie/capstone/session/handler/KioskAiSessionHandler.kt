@@ -78,7 +78,7 @@ class KioskAiSessionHandler(
 
         val clientVoiceChannel = Channel<ByteArray>(
             capacity = 128, // 0.1초 마다 청크 보낼 시 12.8초 정도 저장 가능
-            onBufferOverflow = BufferOverflow.SUSPEND
+            onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
         session.attributes[CLIENT_VOICE_CHANNEL_KEY] = clientVoiceChannel
