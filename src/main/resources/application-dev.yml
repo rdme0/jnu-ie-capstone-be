@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:15432/kiosk
+    url: jdbc:postgresql://${DEV_POSTGRES_URL}:${DEV_POSTGRES_PORT}/${DEV_POSTGRES_DATABASE}
     username: postgres
     password: 1
     driver-class-name: org.postgresql.Driver
