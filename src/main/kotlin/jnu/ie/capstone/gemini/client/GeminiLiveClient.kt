@@ -196,7 +196,7 @@ class GeminiLiveClient(
         inputSTTBuffer: StringBuilder
     ) {
         val isTurnComplete = message.serverContent()
-            .flatMap { it.turnComplete() }
+            .flatMap { it.generationComplete() }
             .orElse(false)
 
         if (isTurnComplete && outputSTTBuffer.isNotEmpty()) {
