@@ -7,13 +7,6 @@ spring:
   jpa:
     hibernate.ddl-auto: update
 
-  data:
-    redis:
-      host: ${PROD_REDIS_URL}
-      port: ${PROD_REDIS_PORT}
-      password: ${PROD_REDIS_PASSWORD}
-      database: ${PROD_REDIS_DATABASE}
-
 spring.security.oauth2.client:
   registration:
     kakao:

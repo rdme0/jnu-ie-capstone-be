@@ -8,11 +8,6 @@ spring:
     properties.hibernate.format_sql: true
     defer-datasource-initialization: true
     hibernate.ddl-auto: update
-  
-  data:
-    redis:
-      host: localhost
-      port: 16379
 
 spring.security.oauth2.client:
   registration:
