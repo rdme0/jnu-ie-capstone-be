@@ -13,6 +13,14 @@
 - **유연한 상호작용**: 정형화된 버튼 조작의 한계를 넘어, 자연어 대화를 통한 주문 처리 시도.
 - **신뢰성 확보**: 생성형 AI의 고질적인 **환각(Hallucination) 현상**을 **State Machine**과 **RAG**를 통해 **완화**하고자 노력함.
 
+### 🖼 프로젝트 배경
+![프로젝트 배경](img/프로젝트%20배경.png)
+
+### 🎯 구현 범위
+- **실시간 음성 주문**: 사용자 음성 입력을 WebSocket으로 수신하고 Gemini Live에 스트리밍합니다.
+- **의미 기반 메뉴 추천**: 발화와 정확히 일치하지 않는 표현도 `pgvector` 기반 RAG로 매칭합니다.
+- **장바구니 및 결제 흐름 제어**: 주문, 결제 확인, 결제 완료까지의 흐름을 상태 머신으로 제한합니다.
+
 ---
 
 ## ✨ 주요 기능 (Key Features)
@@ -31,6 +39,25 @@
 
 ### 4. 상태 기반 안전장치 (Spring State Machine)
 - AI의 예측 불가능한 행동을 제어하기 위해, 상태 머신을 도입하여 각 단계에서 허용된 발화와 행동만을 수행하도록 제한하였습니다.
+
+---
+
+## 🖥 시연 화면 예시
+
+아래 이미지는 프로젝트 동작 예시를 보여주기 위한 화면입니다. 본 저장소의 주요 구현 범위는 UI 자체보다 **음성 주문 처리, AI 에이전트 로직, WebSocket 세션 관리, RAG 기반 메뉴 검색, 상태 머신 제어**에 있습니다.
+프론트엔드 구현은 별도 저장소인 [sseinn/capstone_ie](https://github.com/sseinn/capstone_ie)에서 확인할 수 있습니다.
+
+### 시작하기
+![시작하기](img/시작하기.png)
+
+### 주문 확인
+![주문확인](img/주문확인.png)
+
+### 결제
+![결제](img/결제.png)
+
+### 결제 완료
+![결제완료](img/결제완료.png)
 
 ---
 
@@ -98,6 +125,19 @@ sequenceDiagram
             end
         end
     end
+```
+
+### 🔁 주문 상태 전이 (State Machine)
+```mermaid
+stateDiagram-v2
+    [*] --> MENU_SELECTION
+    MENU_SELECTION --> PAYMENT_CONFIRMATION: CONFIRM_PAYMENT
+    MENU_SELECTION --> CANCELLED: CANCEL
+    PAYMENT_CONFIRMATION --> MENU_SELECTION: PREVIOUS
+    PAYMENT_CONFIRMATION --> COMPLETED: PROCESS_PAYMENT
+    PAYMENT_CONFIRMATION --> CANCELLED: CANCEL
+    COMPLETED --> [*]
+    CANCELLED --> [*]
 ```
 
 ### 💾 데이터베이스 설계 (ER Diagram)
@@ -214,7 +254,9 @@ direction TB
 ### 사전 요구사항
 
 * **Java 21**
+* **PostgreSQL 17 + pgvector**
 * **Google AI Studio API Key**
+* **Kakao OAuth App Key** (로그인 기능 사용 시)
 
 ### 1. 프로젝트 클론
 
@@ -246,8 +288,6 @@ PROD_URL=
 # 5. Database (Development)
 DEV_POSTGRES_URL=
 DEV_POSTGRES_PORT=
-DEV_POSTGRES_USERNAME=
-DEV_POSTGRES_PASSWORD=
 DEV_POSTGRES_DATABASE=
 
 # 6. Database (Production)
@@ -264,6 +304,21 @@ PROD_POSTGRES_DATABASE=
 ```bash
 ./gradlew bootRun
 ```
+
+기본 실행 설정은 아래와 같습니다.
+
+- **기본 프로필**: `dev`
+- **기본 포트**: `18080`
+- **WebSocket 엔드포인트**: `/stores/{storeId}/websocket/kioskSession?accessToken={JWT}`
+- **개발 DB 계정**: 현재 `application-dev.yml` 기준 `postgres / 1`
+
+### 4. 테스트 실행
+
+```bash
+./gradlew test
+```
+
+`KioskAiSessionHandlerE2ETest`는 `src/main/resources/test/*.wav` 음성 파일과 Gemini API, PostgreSQL 환경이 준비된 상태를 전제로 동작합니다.
 
 ---
 
