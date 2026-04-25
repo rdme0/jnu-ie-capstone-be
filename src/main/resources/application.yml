@@ -9,6 +9,9 @@ spring:
       - classpath:config/application-gemini.yml
       - classpath:config/application-rtzr.yml
       - classpath:config/application-prompt.yml
+  threads:
+    virtual:
+      enabled: true
 
 server:
   forward-headers-strategy: native
