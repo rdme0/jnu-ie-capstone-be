@@ -7,12 +7,11 @@ spring:
     import:
       - classpath:config/application-security.yml
       - classpath:config/application-gemini.yml
-      - classpath:config/application-rtzr.yml
       - classpath:config/application-prompt.yml
   threads:
     virtual:
-      enabled: true
+      enabled: false
 
 server:
   forward-headers-strategy: native
-  port: 18080
+  port: 18081
