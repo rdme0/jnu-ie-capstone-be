@@ -76,7 +76,10 @@ class SecurityConfig(
                     "/auth/success",
                     "/error",
                     "/favicon.ico",
-                    "/stores/*/websocket/kioskSession/**"
+                    "/stores/*/websocket/kioskSession",
+                    "/stores/*/websocket/kioskSession/**",
+                    "/bench/stores/*/websocket/kioskSession-blocking",
+                    "/bench/stores/*/websocket/kioskSession-blocking/**"
                 )
                     .permitAll()
                     .anyRequest().authenticated()
