@@ -1,4 +1,4 @@
-﻿spring:
+spring:
   application.name: capstone
   profiles.default: dev
   main:
@@ -10,8 +10,8 @@
       - classpath:config/application-prompt.yml
   threads:
     virtual:
-      enabled: true
+      enabled: false
 
 server:
   forward-headers-strategy: native
-  port: 18080
+  port: 18081
