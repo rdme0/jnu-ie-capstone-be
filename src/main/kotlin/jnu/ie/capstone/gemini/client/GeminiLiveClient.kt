@@ -29,7 +29,7 @@ import kotlin.jvm.optionals.getOrNull
 class GeminiLiveClient(
     private val config: GeminiConfig,
     private val mapper: ObjectMapper
-) {
+) : GeminiLiveGateway {
 
     companion object {
         private const val API_VERSION = "v1alpha"
@@ -41,11 +41,11 @@ class GeminiLiveClient(
         .httpOptions(HttpOptions.builder().apiVersion(API_VERSION).build())
         .build()
 
-    suspend fun getLiveResponse(
+    override suspend fun getLiveResponse(
         geminiReadySignal: CompletableDeferred<Unit>,
         inputData: Flow<GeminiInput>,
         prompt: String,
-        model: GeminiModel = GeminiModel.GEMINI_2_5_FLASH_NATIVE_AUDIO
+        model: GeminiModel
     ): Flow<GeminiOutput> {
         return try {
             callbackFlow {

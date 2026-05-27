@@ -1,6 +1,6 @@
 package jnu.ie.capstone.session.service
 
-import jnu.ie.capstone.gemini.client.GeminiLiveClient
+import jnu.ie.capstone.gemini.client.GeminiLiveGateway
 import jnu.ie.capstone.gemini.config.PromptConfig
 import jnu.ie.capstone.gemini.constant.enums.GeminiFunctionSignature.*
 import jnu.ie.capstone.gemini.dto.client.internal.Context.*
@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @Service
 class KioskSessionService(
-    private val liveClient: GeminiLiveClient,
+    private val liveClient: GeminiLiveGateway,
     private val menuService: MenuCoordinateService,
     private val promptConfig: PromptConfig,
     private val shoppingCartService: KioskShoppingCartService
