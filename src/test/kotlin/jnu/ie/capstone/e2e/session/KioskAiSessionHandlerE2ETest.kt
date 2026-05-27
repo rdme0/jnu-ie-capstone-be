@@ -1,3 +1,5 @@
+package jnu.ie.capstone.e2e.session
+
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import jakarta.websocket.ContainerProvider
@@ -38,6 +40,7 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
+import kotlin.time.Duration.Companion.milliseconds
 
 @SpringBootTest(
     classes = [Application::class],
@@ -97,16 +100,16 @@ class KioskAiSessionHandlerE2ETest(
         val session = getSession(connectionLatch, headers)
 
         runBlocking {
-            withTimeout(5000) { connectionLatch.await() }
+            withTimeout(5000.milliseconds) { connectionLatch.await() }
 
-            withTimeout(10000) { readyLatch.await() }
+            withTimeout(10000.milliseconds) { readyLatch.await() }
 
             logger.info { "서버 준비 완료!" }
 
             assertThat(nowState).isEqualTo(SessionState.MENU_SELECTION)
 
             logger.info { "Gemini의 첫 인사 대기 (혹은 패스)" }
-            val firstGreeting = withTimeoutOrNull(10000) {
+            val firstGreeting = withTimeoutOrNull(10000.milliseconds) {
                 turnEndChannel.receive()
                 logger.info("Gemini가 먼저 인사함!")
                 while (turnEndChannel.tryReceive().isSuccess) {}
@@ -141,7 +144,7 @@ class KioskAiSessionHandlerE2ETest(
 
             logger.info { "--- PHASE 1 성공! ---" }
 
-            delay(500)
+            delay(500.milliseconds)
 
             logger.info("--- PHASE 2 : '아아' 주문 ---")
 
@@ -171,7 +174,7 @@ class KioskAiSessionHandlerE2ETest(
 
             logger.info { "PHASE 2 성공!" }
 
-            delay(500)
+            delay(500.milliseconds)
 
             logger.info("--- PHASE 3 : '이대로 주문해줘' ---")
             while (turnEndChannel.tryReceive().isSuccess) {}
@@ -193,7 +196,7 @@ class KioskAiSessionHandlerE2ETest(
             assertThat(nowState).isEqualTo(SessionState.PAYMENT_CONFIRMATION)
 
             logger.info { "모든 E2E 테스트 시나리오 완료. 5초 후 세션을 종료합니다." }
-            delay(5000)
+            delay(5000.milliseconds)
             session.close()
         }
     }
@@ -277,7 +280,7 @@ class KioskAiSessionHandlerE2ETest(
             while (stream.read(buffer).also { bytesRead = it } != -1) {
                 val chunkToSend = if (bytesRead < buffer.size) buffer.copyOf(bytesRead) else buffer
                 session.sendMessage(BinaryMessage(chunkToSend))
-                delay(100) // 16kHz 데이터 3200바이트는 정확히 0.1초
+                delay(100.milliseconds) // 16kHz 데이터 3200바이트는 정확히 0.1초
             }
         }
 
@@ -291,12 +294,12 @@ class KioskAiSessionHandlerE2ETest(
         val silenceIterations = (silenceMs / 100) + 5
 
         try {
-            withTimeout(15000) {
+            withTimeout(15000.milliseconds) {
                 val silenceJob = launch {
                     repeat(silenceIterations.toInt()) {
                         if (!isActive) return@repeat
                         session.sendMessage(BinaryMessage(silentChunk))
-                        delay(100)
+                        delay(100.milliseconds)
                     }
                 }
                 try {
