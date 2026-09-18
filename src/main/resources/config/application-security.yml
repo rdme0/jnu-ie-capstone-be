@@ -24,5 +24,6 @@ uri:
     - http://localhost:*
     - https://localhost:*
     - https://voicekiosk.vercel.app
+    - https://kiosk.surang.dev
   success-path: /auth/success
   default-redirect-origin: http://localhost:3000
