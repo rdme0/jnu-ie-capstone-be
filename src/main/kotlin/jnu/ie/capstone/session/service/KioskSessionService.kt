@@ -1,5 +1,6 @@
 package jnu.ie.capstone.session.service
 
+import com.google.genai.types.FunctionResponseScheduling
 import jnu.ie.capstone.gemini.client.GeminiLiveGateway
 import jnu.ie.capstone.gemini.config.PromptConfig
 import jnu.ie.capstone.gemini.constant.enums.GeminiFunctionSignature.*
@@ -24,10 +25,13 @@ import jnu.ie.capstone.session.enums.SessionEvent
 import jnu.ie.capstone.session.enums.SessionState
 import jnu.ie.capstone.session.enums.SessionState.*
 import jnu.ie.capstone.session.service.internal.KioskShoppingCartService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
@@ -134,7 +138,7 @@ class KioskSessionService(
         else -> flowOf(Text(NoContext))
     }
 
-    private suspend fun handleGeminiOutput(
+    private suspend fun CoroutineScope.handleGeminiOutput(
         output: GeminiOutput,
         stateMachine: StateMachine<SessionState, SessionEvent>,
         storeId: Long,
@@ -245,7 +249,7 @@ class KioskSessionService(
         }
     }
 
-    private suspend fun handleGeneralFunctionCall(
+    private suspend fun CoroutineScope.handleGeneralFunctionCall(
         output: FunctionCall,
         storeId: Long,
         ownerInfo: MemberInfo,
@@ -257,20 +261,35 @@ class KioskSessionService(
         var isCartUpdated = false
 
         when (output.signature) {
-            SEARCH_MENU_RAG -> {
+            SEARCH_MENU_RAG -> launch {
                 val params = output.params as SearchMenuRAG
 
-                val relevantMenus: List<MenuInternalDTO> = menuService.getMenuRelevant(
-                    text = params.searchText,
-                    storeId = storeId,
-                    ownerInfo = ownerInfo
-                )
+                val result = try {
+                    val relevantMenus = menuService.getMenuRelevant(
+                        text = params.searchText,
+                        storeId = storeId,
+                        ownerInfo = ownerInfo
+                    )
+
+                    relevantMenus.joinToString("\n\n" + "-".repeat(20) + "\n\n") {
+                        it.toString()
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.error(e) {
+                        "RAG 메뉴 검색 실패: searchText=${params.searchText}"
+                    }
+
+                    "메뉴 검색에 실패했습니다. 사용자에게 메뉴를 다시 말씀해 달라고 안내하세요."
+                }
 
                 geminiInputChannel.send(
                     GeminiInput.ToolResponse(
                         id = output.id,
                         functionName = output.signature.name,
-                        result = relevantMenus.joinToString("\n\n" + "-".repeat(20) + "\n\n") { it.toString() }
+                        result = result,
+                        scheduling = FunctionResponseScheduling.Known.INTERRUPT
                     )
                 )
             }
