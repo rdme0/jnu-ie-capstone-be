@@ -1,7 +1,9 @@
 package jnu.ie.capstone.common.websocket.interceptor
 
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
+import jnu.ie.capstone.common.websocket.interceptor.JwtAuthHandshakeInterceptor.Companion.DEMO_KIOSK_ATTRIBUTE
 import jnu.ie.capstone.store.service.StoreService
+import org.springframework.http.HttpStatus
 import mu.KotlinLogging
 import org.springframework.http.server.ServerHttpRequest
 import org.springframework.http.server.ServerHttpResponse
@@ -17,6 +19,7 @@ class StoreIdHandshakeInterceptor(
 ) : HandshakeInterceptor {
     private companion object {
         val logger = KotlinLogging.logger {}
+        const val DEMO_STORE_ID = 1L
     }
 
     override fun beforeHandshake(
@@ -37,6 +40,12 @@ class StoreIdHandshakeInterceptor(
 
         if (storeIdIndex > 0 && storeIdIndex < uriTemplateVars.size) {
             val storeId = uriTemplateVars[storeIdIndex].toLongOrNull() ?: return false
+
+            if (attributes[DEMO_KIOSK_ATTRIBUTE] == true && storeId != DEMO_STORE_ID) {
+                logger.warn { "시연 키오스크의 허용되지 않은 store id 요청: $storeId" }
+                response.setStatusCode(HttpStatus.FORBIDDEN)
+                return false
+            }
 
             storeService.getBy(id = storeId, ownerId = userDetails.memberInfo.id)
                 ?: run {
