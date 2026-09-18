@@ -286,9 +286,9 @@ DEV_URL=
 PROD_URL=
 
 # 5. Database (Development)
-DEV_POSTGRES_URL=
-DEV_POSTGRES_PORT=
-DEV_POSTGRES_DATABASE=
+DEV_POSTGRES_URL=localhost
+DEV_POSTGRES_PORT=5432
+DEV_POSTGRES_DATABASE=capstone
 
 # 6. Database (Production)
 PROD_POSTGRES_URL=
@@ -299,7 +299,36 @@ PROD_POSTGRES_DATABASE=
 
 ```
 
-### 3. 애플리케이션 실행
+### 3. 개발 DB 실행
+
+개발 Compose는 `deploy/dev`에, 배포 Compose는 `deploy/prod`에 분리되어 있습니다. 개발 DB를 실행하려면 프로젝트 루트에서 다음 명령을 사용합니다.
+
+```bash
+docker compose -f deploy/dev/docker-compose.yml up -d
+```
+
+컨테이너 상태와 `vector` 확장 활성화 여부는 아래 명령으로 확인할 수 있습니다.
+
+```bash
+docker compose -f deploy/dev/docker-compose.yml ps
+docker compose -f deploy/dev/docker-compose.yml exec postgres sh -c 'psql -U postgres -d "$POSTGRES_DB" -c "\dx vector"'
+```
+
+개발 DB는 `postgres_dev_data` Docker 볼륨에 유지됩니다. 컨테이너만 중지하거나 제거하려면 다음 명령을 사용합니다.
+
+```bash
+docker compose -f deploy/dev/docker-compose.yml down
+```
+
+DB 데이터를 포함해 초기화하려면 다음 명령을 사용합니다. 새 볼륨을 만들 때 `vector` 확장도 다시 활성화됩니다.
+
+```bash
+docker compose -f deploy/dev/docker-compose.yml down -v
+```
+
+### 4. 애플리케이션 실행
+
+개발 DB 컨테이너가 실행 중인 상태에서 애플리케이션을 시작합니다.
 
 ```bash
 ./gradlew bootRun
@@ -308,11 +337,21 @@ PROD_POSTGRES_DATABASE=
 기본 실행 설정은 아래와 같습니다.
 
 - **기본 프로필**: `dev`
-- **기본 포트**: `18080`
-- **WebSocket 엔드포인트**: `/stores/{storeId}/websocket/kioskSession?accessToken={JWT}`
+- **기본 포트**: `18081`
+- **WebSocket 엔드포인트**: `/stores/{storeId}/websocket/kioskSession` (시연 키오스크는 토큰 없이 매장 `1`에 연결)
 - **개발 DB 계정**: 현재 `application-dev.yml` 기준 `postgres / 1`
 
-### 4. 테스트 실행
+### 5. 프로덕션 Compose 실행
+
+프로덕션 Compose는 Spring 애플리케이션과 PostgreSQL을 함께 실행합니다. `.env`에 `PROD_POSTGRES_DATABASE`, `PROD_POSTGRES_USERNAME`, `PROD_POSTGRES_PASSWORD`, `GEMINI_API_KEY` 등 프로덕션 환경 변수를 설정한 뒤 실행합니다. 컨테이너 내부에서 애플리케이션은 `postgres:5432`로 DB에 연결합니다.
+
+```bash
+docker compose -f deploy/prod/docker-compose.yml up -d --build
+```
+
+PostgreSQL은 호스트의 `127.0.0.1:${PROD_POSTGRES_PORT:-5432}`에만 열리고, 애플리케이션은 `${PROD_SERVER_PORT:-18081}`에서 서비스됩니다.
+
+### 6. 테스트 실행
 
 ```bash
 ./gradlew test
