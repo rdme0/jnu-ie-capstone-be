@@ -26,6 +26,7 @@ class MemberDevInitializer(
     }
 
     @Transactional
+    @Order(1)
     @EventListener(ApplicationReadyEvent::class)
     fun init() {
         val member = memberRepository.findByEmail(TEST_EMAIL)

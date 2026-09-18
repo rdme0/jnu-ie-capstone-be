@@ -26,6 +26,7 @@ class StoreDevInitializer(
     }
 
     @Transactional
+    @Order(2)
     @EventListener(ApplicationReadyEvent::class)
     fun init() {
         val owner = memberCoordinateService.getEntity(1L)

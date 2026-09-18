@@ -24,6 +24,7 @@ class MemberProdInitializer(
     }
 
     @Transactional
+    @Order(1)
     @EventListener(ApplicationReadyEvent::class)
     fun init() {
         memberRepository.findByEmail(TEST_EMAIL)
