@@ -14,7 +14,7 @@ object GeminiFunctionDeclaration {
                     .name(SEARCH_MENU_RAG.text)
                     .parameters(GeminiSchema.SEARCH_MENU_RAG_PARAMS_SCHEMA)
                     .response(GeminiSchema.SEARCH_MENU_RAG_RESPONSE_SCHEMA)
-                    .behavior(Behavior.Known.BLOCKING)
+                    .behavior(Behavior.Known.NON_BLOCKING)
                     .build()
             )
         ).build()

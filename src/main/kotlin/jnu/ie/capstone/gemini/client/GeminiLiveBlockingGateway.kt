@@ -7,7 +7,7 @@ import jnu.ie.capstone.gemini.dto.client.response.GeminiOutput
 interface GeminiLiveBlockingGateway {
     fun connect(
         prompt: String,
-        model: GeminiModel = GeminiModel.GEMINI_2_5_FLASH_NATIVE_AUDIO
+        model: GeminiModel = GeminiModel.GEMINI_3_8_LIVE
     ): GeminiLiveBlockingSessionGateway
 }
 

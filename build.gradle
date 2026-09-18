@@ -84,7 +84,7 @@ dependencies {
     implementation 'org.hibernate.orm:hibernate-vector:6.6.22.Final'
 
     //Gemini
-    implementation 'com.google.genai:google-genai:1.15.0'
+    implementation 'com.google.genai:google-genai:1.71.0'
 
 }
 

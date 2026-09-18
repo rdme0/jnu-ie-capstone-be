@@ -6,7 +6,6 @@ import com.google.genai.types.*
 import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.gemini.config.GeminiConfig
 import jnu.ie.capstone.gemini.constant.enums.GeminiModel
-import kotlinx.coroutines.future.await
 import org.springframework.stereotype.Component
 
 
@@ -31,46 +30,6 @@ class GeminiClient(
 
         return embeddings.orElse(null)
             ?: throw InternalServerException(IllegalStateException("Gemini 응답이 비었습니다."))
-    }
-
-    suspend fun getTextResponse(
-        prompt: String,
-        request: Any,
-        model: GeminiModel = GeminiModel.GEMINI_2_5_FLASH,
-        schema: Schema? = null
-    ): String {
-        val systemInstruction = Content.fromParts(Part.fromText(prompt))
-        val finalRequest = request as? String ?: mapper.writeValueAsString(request)
-        val userContent = Content.fromParts(Part.fromText(finalRequest))
-        val config = buildConfig(systemInstruction, schema)
-        val responseFuture = client.async.models.generateContent(
-            model.toString(),
-            userContent,
-            config
-        )
-
-        val response = responseFuture.await().text()
-            ?: throw InternalServerException(IllegalStateException("Gemini 응답이 비었습니다."))
-
-        return response
-    }
-
-    private fun buildConfig(
-        systemInstruction: Content,
-        schema: Schema? = null,
-        thinkingBudget: Int = -1
-    ): GenerateContentConfig {
-
-        val building = GenerateContentConfig.builder()
-            .systemInstruction(systemInstruction)
-            .candidateCount(1)
-            .thinkingConfig(ThinkingConfig.builder().thinkingBudget(thinkingBudget).build())
-
-        if (schema != null)
-            building.responseJsonSchema(schema)
-                .responseMimeType("application/json")
-
-        return building.build()
     }
 
 }

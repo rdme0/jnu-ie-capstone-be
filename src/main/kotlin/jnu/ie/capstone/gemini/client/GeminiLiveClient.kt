@@ -32,13 +32,11 @@ class GeminiLiveClient(
 ) : GeminiLiveGateway {
 
     companion object {
-        private const val API_VERSION = "v1alpha"
         private val logger = KotlinLogging.logger {}
     }
 
     private val client = Client.builder()
         .apiKey(config.apiKey)
-        .httpOptions(HttpOptions.builder().apiVersion(API_VERSION).build())
         .build()
 
     override suspend fun getLiveResponse(
@@ -80,7 +78,6 @@ class GeminiLiveClient(
             .outputAudioTranscription(AudioTranscriptionConfig.builder().build())
             .realtimeInputConfig(buildRealTimeInputConfig())
             .systemInstruction(Content.fromParts(Part.fromText(prompt)))
-            .proactivity(ProactivityConfig.builder().proactiveAudio(true).build())
             .speechConfig(
                 SpeechConfig.builder()
                     .languageCode("ko-KR")
@@ -244,6 +241,9 @@ class GeminiLiveClient(
                         .id(input.id)
                         .name(input.functionName)
                         .response(mapOf("result" to input.result))
+                        .apply {
+                            input.scheduling?.let { scheduling(it) }
+                        }
                         .build()
 
                     val params = LiveSendToolResponseParameters.builder()

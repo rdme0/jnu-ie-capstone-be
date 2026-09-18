@@ -11,6 +11,6 @@ interface GeminiLiveGateway {
         geminiReadySignal: CompletableDeferred<Unit>,
         inputData: Flow<GeminiInput>,
         prompt: String,
-        model: GeminiModel = GeminiModel.GEMINI_2_5_FLASH_NATIVE_AUDIO
+        model: GeminiModel = GeminiModel.GEMINI_3_8_LIVE
     ): Flow<GeminiOutput>
 }

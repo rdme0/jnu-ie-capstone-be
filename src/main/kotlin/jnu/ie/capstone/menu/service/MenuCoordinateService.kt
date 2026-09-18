@@ -22,7 +22,6 @@ import jnu.ie.capstone.menu.util.MenuUtil
 import jnu.ie.capstone.store.annotation.AssertStoreOwner
 import jnu.ie.capstone.store.exception.NoSuchStoreException
 import jnu.ie.capstone.store.model.entity.Store
-import jnu.ie.capstone.store.service.StoreService
 import jnu.ie.capstone.store.service.internal.StoreDataService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -37,13 +36,6 @@ class MenuCoordinateService(
     private val storeDataService: StoreDataService,
     private val util: MenuUtil
 ) {
-
-    private companion object {
-        val EMBEDDING_PLAN = EmbeddingPlan(
-            planA = GeminiModel.GEMINI_EMBEDDING_001,
-            planB = GeminiModel.TEXT_EMBEDDING_004
-        )
-    }
 
     @Transactional
     @AssertStoreOwner(memberInfo = "#ownerInfo", storeId = "#storeId")
@@ -218,11 +210,7 @@ class MenuCoordinateService(
         ownerInfo: MemberInfo,
     ): List<MenuInternalDTO> {
 
-        val embedding = try {
-            util.embedVector(text, EMBEDDING_PLAN.planA)
-        } catch (_: ServerException) {
-            util.embedVector(text, EMBEDDING_PLAN.planB)
-        }
+        val embedding = util.embedVector(text, GeminiModel.GEMINI_EMBEDDING_001)
 
         val relevantMenus = menuDataService.getRelevantBy(
             storeId = storeId,
@@ -247,11 +235,7 @@ class MenuCoordinateService(
         store: Store
     ): List<Pair<Menu, List<Option>?>> {
         return request.menus.map { createDTO ->
-            val menuEmbeddings = try {
-                util.embedVector(createDTO.name.value, EMBEDDING_PLAN.planA)
-            } catch (_: ServerException) {
-                util.embedVector(createDTO.name.value, EMBEDDING_PLAN.planB)
-            }
+            val menuEmbeddings = util.embedVector(createDTO.name.value)
             buildMenuAndOptions(store, createDTO, menuEmbeddings)
         }
     }
@@ -261,11 +245,7 @@ class MenuCoordinateService(
         request: UpdateMenuRequest
     ): Menu {
         if (oldMenu.name.value != request.name.value) {
-            oldMenu.embedding = try {
-                util.embedVector(request.name.value, EMBEDDING_PLAN.planA)
-            } catch (_: ServerException) {
-                util.embedVector(request.name.value, EMBEDDING_PLAN.planB)
-            }
+            oldMenu.embedding = util.embedVector(request.name.value)
         }
 
         oldMenu.name = request.name
