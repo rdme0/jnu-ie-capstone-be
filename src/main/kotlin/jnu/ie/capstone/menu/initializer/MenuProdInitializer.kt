@@ -1,6 +1,5 @@
 package jnu.ie.capstone.menu.initializer
 
-import com.google.genai.errors.ServerException
 import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.gemini.constant.enums.GeminiModel
 import jnu.ie.capstone.menu.model.entity.Menu
@@ -22,6 +21,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import kotlin.jvm.optionals.getOrNull
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 @Component
 @Order(3)
@@ -35,13 +35,31 @@ class MenuProdInitializer(
 
     private companion object {
         val logger = KotlinLogging.logger {}
-        val MENUS = listOf("아이스 아메리카노", "아이스 카페라떼", "아이스 카푸치노", "아이스 카페모카", "아이스티")
+        val MENUS = listOf(
+            "아이스 아메리카노",
+            "아이스 카페라떼",
+            "아이스 카푸치노",
+            "아이스 카페모카",
+            "아이스티",
+            "카라멜 마키아또",
+            "돌체 콜드 브루",
+            "자바 칩 프라푸치노",
+            "말차 크림 프라푸치노",
+            "딸기 딜라이트 요거트 블렌디드",
+            "클래식 스콘",
+            "블루베리 머핀",
+            "초콜릿 칩 쿠키",
+            "바질 토마토 크림치즈 베이글",
+            "탕종 플레인 베이글",
+            "치킨 베이컨 랩"
+        )
         val MENU_COUNT = MENUS.size
         val OPTIONS = listOf("샷 추가", "시럽 추가", "디카페인", "설탕 추가", "아이스크림 추가")
         val OPTION_COUNT = OPTIONS.size
     }
 
     @Transactional
+    @Order(3)
     @EventListener(ApplicationReadyEvent::class)
     suspend fun init() {
 
@@ -51,17 +69,11 @@ class MenuProdInitializer(
         if (menuRepository.count() < 1) {
             logger.info { "테스트 menu ${MENU_COUNT}개 저장 중" }
 
-            val menus = (1..MENU_COUNT).map {
+            val menus = MENUS.map { name ->
 
-                val name = MENUS[it % MENUS.size]
+                val embeddings = util.embedVector(name, GeminiModel.GEMINI_EMBEDDING_001)
 
-                val embeddings = try {
-                    util.embedVector(name, GeminiModel.GEMINI_EMBEDDING_001)
-                } catch (_: ServerException) {
-                    util.embedVector(name, GeminiModel.TEXT_EMBEDDING_004)
-                }
-
-                delay(100)
+                delay(100.milliseconds)
 
                 Menu.builder()
                     .name(MenuName(name))

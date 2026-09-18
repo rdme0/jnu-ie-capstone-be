@@ -1,0 +1,44 @@
+name: capstone-prod
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/prod/Dockerfile
+    image: capstone:prod
+    container_name: capstone-prod-app
+    env_file:
+      - ../../.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PROD_POSTGRES_URL: postgres
+      PROD_POSTGRES_PORT: 5432
+    ports:
+      - "${PROD_SERVER_PORT:-18081}:18081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: capstone-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PROD_POSTGRES_USERNAME:?PROD_POSTGRES_USERNAME is required}
+      POSTGRES_PASSWORD: ${PROD_POSTGRES_PASSWORD:?PROD_POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${PROD_POSTGRES_DATABASE:?PROD_POSTGRES_DATABASE is required}
+    ports:
+      - "127.0.0.1:${PROD_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ../../docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres_prod_data:

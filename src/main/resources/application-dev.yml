@@ -7,7 +7,7 @@ spring:
   jpa:
     properties.hibernate.format_sql: true
     defer-datasource-initialization: true
-    hibernate.ddl-auto: update
+    hibernate.ddl-auto: create
 
 spring.security.oauth2.client:
   registration:

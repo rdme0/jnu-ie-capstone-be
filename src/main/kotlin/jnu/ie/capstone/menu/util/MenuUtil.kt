@@ -17,7 +17,7 @@ class MenuUtil(
         maxAttempts = 3,
         backoff = Backoff(delay = 1000, multiplier = 2.0, random = true)
     )
-    fun embedVector(text: String, model: GeminiModel): FloatArray {
+    fun embedVector(text: String, model: GeminiModel = GeminiModel.GEMINI_EMBEDDING_001): FloatArray {
         return geminiClient
             .getEmbedding(text, model)
             .first()

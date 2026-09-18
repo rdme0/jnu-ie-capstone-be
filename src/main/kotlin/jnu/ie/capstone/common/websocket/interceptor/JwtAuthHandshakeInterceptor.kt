@@ -18,6 +18,11 @@ import java.lang.Exception
 class JwtAuthHandshakeInterceptor(
     private val helper: JwtAuthHelper
 ) : HandshakeInterceptor {
+    companion object {
+        const val DEMO_KIOSK_ATTRIBUTE = "isDemoKiosk"
+        private const val DEMO_MEMBER_ID = 1L
+    }
+
     private val logger = KotlinLogging.logger {}
 
     override fun beforeHandshake(
@@ -33,12 +38,20 @@ class JwtAuthHandshakeInterceptor(
 
         try {
             val accessToken = request.servletRequest.getParameter("accessToken")
-                ?: throw UnauthorizedException()
-
-            val auth: Authentication = helper.authenticate(accessToken, isBearer = false)
+            val isDemoKiosk = accessToken.isNullOrBlank()
+            val auth: Authentication = if (isDemoKiosk) {
+                helper.authenticateDemo(DEMO_MEMBER_ID)
+            } else {
+                helper.authenticate(accessToken, isBearer = false)
+            }
 
             attributes["principal"] = auth
-            logger.info { "WebSocket 핸드셰이크 인증 성공: User=${auth.name}" }
+            if (isDemoKiosk) {
+                attributes[DEMO_KIOSK_ATTRIBUTE] = true
+                logger.info { "로그인 없는 시연 WebSocket 연결: User=${auth.name}" }
+            } else {
+                logger.info { "WebSocket 핸드셰이크 인증 성공: User=${auth.name}" }
+            }
 
             return true
         } catch (ex: Exception) {

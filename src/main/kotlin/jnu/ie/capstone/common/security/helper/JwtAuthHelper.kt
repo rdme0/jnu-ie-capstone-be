@@ -4,6 +4,7 @@ import jnu.ie.capstone.common.exception.client.UnauthorizedException
 import jnu.ie.capstone.common.exception.server.InternalServerException
 import jnu.ie.capstone.common.security.dto.KioskUserDetails
 import jnu.ie.capstone.common.security.util.JwtUtil
+import jnu.ie.capstone.member.dto.MemberInfo
 import jnu.ie.capstone.member.service.MemberCoordinateService
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
@@ -41,6 +42,18 @@ class JwtAuthHelper(
             cause = IllegalStateException("토큰이 유효하지만 DB에 해당 회원 정보가 없음")
         )
 
+        return createAuthentication(memberInfo)
+    }
+
+    fun authenticateDemo(memberId: Long): Authentication {
+        val memberInfo = memberService.get(memberId) ?: throw InternalServerException(
+            cause = IllegalStateException("시연 사용자(id=$memberId)가 존재하지 않습니다.")
+        )
+
+        return createAuthentication(memberInfo)
+    }
+
+    private fun createAuthentication(memberInfo: MemberInfo): Authentication {
         val kioskUserDetails = KioskUserDetails(memberInfo = memberInfo)
 
         return UsernamePasswordAuthenticationToken(

@@ -1,5 +1,6 @@
 package jnu.ie.capstone.gemini.dto.client.request
 
+import com.google.genai.types.FunctionResponseScheduling
 import jnu.ie.capstone.gemini.dto.client.internal.Context
 
 sealed class GeminiInput {
@@ -10,6 +11,7 @@ sealed class GeminiInput {
     data class ToolResponse(
         val id: String?,
         val functionName: String,
-        val result: String
+        val result: String,
+        val scheduling: FunctionResponseScheduling.Known? = null
     ) : GeminiInput()
 }

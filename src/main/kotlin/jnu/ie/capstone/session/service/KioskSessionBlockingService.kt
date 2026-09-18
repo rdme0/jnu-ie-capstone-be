@@ -4,6 +4,7 @@ import jnu.ie.capstone.gemini.client.GeminiLiveBlockingGateway
 import jnu.ie.capstone.gemini.client.GeminiLiveBlockingSessionGateway
 import jnu.ie.capstone.gemini.config.PromptConfig
 import jnu.ie.capstone.gemini.constant.enums.GeminiFunctionSignature.*
+import jnu.ie.capstone.gemini.constant.enums.GeminiModel
 import jnu.ie.capstone.gemini.dto.client.internal.Context.MenuSelectionContext
 import jnu.ie.capstone.gemini.dto.client.internal.Context.NoContext
 import jnu.ie.capstone.gemini.dto.client.request.GeminiInput
@@ -67,7 +68,7 @@ class KioskSessionBlockingService(
     ) {
         liveClient.connect(
             prompt = promptConfig.kiosk,
-            model = jnu.ie.capstone.gemini.constant.enums.GeminiModel.GEMINI_2_5_FLASH_NATIVE_AUDIO
+            model = GeminiModel.GEMINI_3_8_LIVE
         ).use { geminiSession ->
             onReady()
 

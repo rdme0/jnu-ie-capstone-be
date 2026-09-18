@@ -69,7 +69,6 @@ class GeminiLiveBlockingClient(
             .outputAudioTranscription(AudioTranscriptionConfig.builder().build())
             .realtimeInputConfig(buildRealTimeInputConfig())
             .systemInstruction(Content.fromParts(Part.fromText(prompt)))
-            .proactivity(ProactivityConfig.builder().proactiveAudio(true).build())
             .speechConfig(
                 SpeechConfig.builder()
                     .languageCode("ko-KR")
@@ -233,6 +232,9 @@ class GeminiLiveBlockingSession(
                     .id(input.id)
                     .name(input.functionName)
                     .response(mapOf("result" to input.result))
+                    .apply {
+                        input.scheduling?.let { scheduling(it) }
+                    }
                     .build()
 
                 val params = LiveSendToolResponseParameters.builder()
